@@ -1,11 +1,5 @@
 from switchyard.switchyard.lib.userlib import *
 
-def main(netObj):
-    BROADCAST = "FF:FF:FF:FF:FF:FF"
-    capacity = 5
-    size = 0
-    table = []
-
 class tableEntry:
     port = -1 
     addr = -1
@@ -34,6 +28,12 @@ class tableEntry:
 
         for x in self.table:
             x.self.incrementTTL()
+            
+def main(netObj):
+    BROADCAST = "FF:FF:FF:FF:FF:FF"
+    capacity = 5
+    size = 0
+    table = []
 
     while 1:
         try:
