@@ -38,31 +38,43 @@ def main(net):
         if ethernet.dst in mymacs:
             print ("Received a packet intended for me")
 
+        #handle broadcasting
+        if ethernet.dst == BROADCAST:
+            broadcast(net, recInfo)
+
         else:
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
                     print("Matched in my table! ")
+                    net.send_packet(entry.port, recInfo.packet)
                 else:
                     #newEntry = tableEntry(recInfo.port, ethernet.dst)
-                    insertEntry(recInfo.port, ethernet.dst)
-                    print("Added a new table entry. ")
+                    insertEntry(recInfo.port, ethernet.dst, size, table)
+                    log_info("Added a new table entry. ")
+                    broadcast(net, recInfo)
+
+        net.send_packet(recInfo.packet)
 
     #Need to before ending program
     net.shutdown()
 
-def insertEntry(self, port, addr):
+def broadcast(net, recInfo):
+    for port in net.ports():
+        net.send_packet(port.name, recInfo.packet)
+
+def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         entry = tableEntry(port, addr)
-        if(self.size == self.capacity):
-            self.table.pop(4)
+        if(size == 5):
+            table.pop(4)
         else:
-            self.size += 1
+            size += 1
 
-        self.table.insert(0, entry)
+        table.insert(0, entry)
 
-        for x in self.table:
-            x.self.incrementTTL()
+        for x in table:
+            x.incrementTTL()
 
 def printContents(self):
     for x in self.table:
