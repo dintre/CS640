@@ -1,4 +1,4 @@
-from switchyard.switchyard.lib.userlib import *
+from switchyard.lib.userlib import *
 
 class tableEntry:
     port = -1 
@@ -10,13 +10,48 @@ class tableEntry:
         self.addr = addr
 
     def incrementTTL(self):
-        ttl += 1
+        self.ttl += 1
 
-    def printContents(self):
-        for x in self.table:
-            print(x.addr)
+def main(net):
+    BROADCAST = "FF:FF:FF:FF:FF:FF"
+    capacity = 5
+    size = 0
+    table = []
+    my_interfaces = net.interfaces()
+    mymacs = [intf.ethaddr for intf in my_interfaces]
 
-    def insertEntry(self, port, addr):
+    while 1:
+        try:
+            recInfo = net.recv_packet()
+        except NoPackets:
+            continue
+        except Shutdown:
+            return
+
+        print("Current Packet: {}".format(net.name))
+
+        ethernet = recInfo.packet.get_header(Ethernet)
+        if ethernet is None:
+            print("Received a non-Ethernet packet?!")
+            continue
+
+        if ethernet.dst in mymacs:
+            print ("Received a packet intended for me")
+
+        else:
+            #loop through table
+            for entry in table:
+                if entry.addr == ethernet.dst:
+                    print("Matched in my table! ")
+                else:
+                    #newEntry = tableEntry(recInfo.port, ethernet.dst)
+                    insertEntry(recInfo.port, ethernet.dst)
+                    print("Added a new table entry. ")
+
+    #Need to before ending program
+    net.shutdown()
+
+def insertEntry(self, port, addr):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         entry = tableEntry(port, addr)
         if(self.size == self.capacity):
@@ -28,43 +63,12 @@ class tableEntry:
 
         for x in self.table:
             x.self.incrementTTL()
-            
-def main(netObj):
-    BROADCAST = "FF:FF:FF:FF:FF:FF"
-    capacity = 5
-    size = 0
-    table = []
 
-    while 1:
-        try:
-            recInfo = netObj.recv_packet()
-        except NoPackets:
-            continue
-        except Shutdown:
-            return
-
-        log_debug("Current Packet: {}".format(net.name))
-
-        ethernet = recInfo.packet.get_header(Ethernet)
-        if eth is None:
-            log_info("Received a non-Ethernet packet?!")
-            continue
-
-        if eth.dst in mymacs:
-            log_info ("Received a packet intended for me")
-
-        else:
-            #loop through table
-            for entry in table:
-                if entry.addr == ethernet.dst:
-                    log_info("Matched in my table! ")
-                else:
-                    newEntry = tableEntry(recInfo.port, ethernet.dst)
-                    log_info("Added a new table entry. ")
+def printContents(self):
+    for x in self.table:
+        print(x.addr)
 
 
-    #Need to before ending program
-    netObj.shutdown()
 
 
 # #class Switch
