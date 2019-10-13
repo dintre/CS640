@@ -18,6 +18,7 @@ def main(net):
     table = []
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
+    matched = False
 
     while True:
         try:
@@ -47,13 +48,17 @@ def main(net):
                 if entry.addr == ethernet.dst:
                     print("Matched in my table! ")
                     net.send_packet(entry.port, recInfo.packet)
+                    matched = True
+
                 else:
-                    #newEntry = tableEntry(recInfo.port, ethernet.dst)
                     insertEntry(recInfo.port, ethernet.dst, size, table)
                     log_info("Added a new table entry. ")
                     broadcast(net, recInfo)
 
-            net.send_packet(recInfo.packet)
+            if matched == False:
+                broadcast(net, recInfo)
+
+        matched = False
 
     #Need to before ending program
     net.shutdown()
