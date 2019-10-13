@@ -13,14 +13,13 @@ class tableEntry:
         self.ttl += 1
 
 def main(net):
-    BROADCAST = "FF:FF:FF:FF:FF:FF"
-    capacity = 5
+    BROADCAST = "ff:ff:ff:ff:ff:ff"
     size = 0
     table = []
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
 
-    while 1:
+    while True:
         try:
             recInfo = net.recv_packet()
         except NoPackets:
@@ -54,14 +53,15 @@ def main(net):
                     log_info("Added a new table entry. ")
                     broadcast(net, recInfo)
 
-        net.send_packet(recInfo.packet)
+            net.send_packet(recInfo.packet)
 
     #Need to before ending program
     net.shutdown()
 
 def broadcast(net, recInfo):
     for port in net.ports():
-        net.send_packet(port.name, recInfo.packet)
+        if port.name != recInfo.input_port:
+            net.send_packet(port.name, recInfo.packet)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
