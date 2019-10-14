@@ -37,6 +37,7 @@ def main(net):
 
         if ethernet.dst in mymacs:
             print ("Received a packet intended for me")
+            continue
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
