@@ -1,10 +1,6 @@
-'''
-Ethernet learning switch in Python.
-Note that this file currently has the code to implement a "hub"
-in it, not a learning switch.  (I.e., it's currently a switch
-that doesn't learn.)
-'''
+
 from switchyard.lib.userlib import *
+import threading
 
 class tableEntry:
     port = -1 
@@ -32,67 +28,42 @@ def main(net):
     hopsToRoot = 0
     receivedSpanningTreeIntf = 'interface spanningtreepacket was received'
     timeSTPReceived = 0
+    timeInterval = 30.0
+    ID = 100000000
 
     'Interface that leads to the root'
     interface = 'null for now'
     'I think switch MAC Ethaddr is in the interface so do not need an additional variable to store that'
 
+    #find lowest port MAC for ID
+    for port in net.ports():
+        if ID > port.MAC:
+            ID = port.MAC
+
+    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
+    broadcast(net, pkt)
+
+
     while True:
-        try:
-            recInfo = net.recv_packet()
-        except NoPackets:
-            continue
-        except Shutdown:
-            return
 
-        print("Current Packet: {}".format(net.name))
-
-        ethernet = recInfo.packet.get_header(Ethernet)
-        if ethernet is None:
-            print("Received a non-Ethernet packet?!")
-            continue
-
-        if ethernet.dst in mymacs:
-            print ("Received a packet intended for me")
-            continue
-
-        #handle broadcasting
-        if ethernet.dst == BROADCAST:
-            broadcast(net, recInfo)
-
-        else:
-            #loop through table
-            for entry in table:
-                if entry.addr == ethernet.dst:
-                    print("Matched in my table! ")
-                    net.send_packet(entry.port, recInfo.packet)
-                    matched = True
-
-                else:
-                    insertEntry(recInfo.port, ethernet.dst, size, table)
-                    log_info("Added a new table entry. ")
-                    broadcast(net, recInfo)
-
-            if matched == False:
-                broadcast(net, recInfo)
-
-        matched = False
-
-    'Only initialize STP protocol if thinks self is root node, do not know how to repeat this every timer seconds'
-    if idCurrentRoot = self:
-    	'Building packet'
-    	Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    	pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
+        
+        'Only initialize STP protocol if thinks self is root node, do not know how to repeat this every timer seconds'
+        if idCurrentRoot = self:
+    	    'Building packet'
+    	    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    	    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
 	
-    'Check current time'
-    if currentTime > timeSTPReceived + 30:
-	idCurrentRoot = self
-	'Send out packets every timer seconds'
+        'Check current time'
+        if currentTime > timeSTPReceived + 30:
+	        idCurrentRoot = self
+	        'Send out packets every timer seconds'
+            threading.Timer(timeInterval, broadcast(net, pkt))
 
-    'I do not know if we need to check the size of the packet to ensure > 40 bytes'
-    'Send out built packet along all Ports every timer seconds, do not know the code for this'
+        'I do not know if we need to check the size of the packet to ensure > 40 bytes'
+        'Send out built packet along all Ports every timer seconds, do not know the code for this'
 
-    while True:
+
         try:
             timestamp,input_port,packet = net.recv_packet()
         except NoPackets:
@@ -131,7 +102,7 @@ def main(net):
                 continue
             
             if ethernet.dst == BROADCAST
-                broadcast(net, input_port, packet)
+                broadcast(net, packet, input_port)
                 continue
 
             #loop through table
@@ -142,16 +113,16 @@ def main(net):
 
                 else:
                     insertEntry(port, ethernet.dst, size, table)
-                    broadcast(net, input_port, packet)
+                    broadcast(net, packet, input_port)
 
             if matched == False:
-                broadcast(net, input_port, packet)
+                broadcast(net, packet, input_port)
 
         matched = False
 
     net.shutdown()
 
-def broadcast(net, input_port, packet):
+def broadcast(net, packet, input_port = ""):
     for port in net.ports():
         if port.name != input_port:
             net.send_packet(port.name, packet)
@@ -168,3 +139,4 @@ def insertEntry(port, addr, size, table):
 
         for x in table:
             x.incrementTTL()
+
