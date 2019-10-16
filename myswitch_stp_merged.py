@@ -1,7 +1,6 @@
 
 from switchyard.lib.userlib import *
 import threading
-import SpanningTreeMessage.py
 
 class tableEntry:
     port = -1 
