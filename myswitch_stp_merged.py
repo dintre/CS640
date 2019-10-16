@@ -65,7 +65,7 @@ def main(net):
             log_debug ("Packet intended for me")
             continue
             
-        if ethernet.dst == BROADCAST
+        if ethernet.dst == BROADCAST:
             broadcast(net, packet, input_port)
             continue
 
