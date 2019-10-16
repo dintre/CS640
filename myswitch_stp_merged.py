@@ -40,8 +40,9 @@ def main(net):
     #Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     #pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
     spm = SpanningTreeMessage("ID", hops_to_root=1)
-    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
+    eth = Ethernet()
+    eth.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    pkt = eth(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
     broadcast(net, pkt)
 
 
