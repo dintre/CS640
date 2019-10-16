@@ -27,19 +27,23 @@ def main(net):
 
     #find lowest port MAC for ID
     for port in net.ports():
-        if id > port.MAC:
-            id = port.MAC
+        if id > port.name:
+            id = port.name
 
     #at startup of switch, flood out packets on all ports
-    eth = Ethernet
-    eth.src = anythingAddr
-    eth.dst = BROADCAST
-    spanMessage = SpanningTreeMessage
-    spanMessage += eth
+    # eth = Ethernet()
+    # eth.src = anythingAddr
+    # eth.dst = BROADCAST
+    # spanMessage = SpanningTreeMessage()
+    # spanMessage += eth
+
 
     #Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     #pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
-    broadcast(net, spanMessage)
+    spm = SpanningTreeMessage("ID", hops_to_root=1)
+    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
+    broadcast(net, pkt)
 
 
     while True:
