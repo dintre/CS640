@@ -36,7 +36,7 @@ def main(net):
     eth.dst = BROADCAST
     spanMessage = SpanningTreeMessage
     spanMessage += eth
-    
+
     #Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     #pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
     broadcast(net, spanMessage)
@@ -44,7 +44,7 @@ def main(net):
 
     while True:
 
-        if idCurrentRoot = self:
+        if idCurrentRoot == self:
     	    'Building packet'
     	    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     	    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
@@ -61,28 +61,27 @@ def main(net):
         log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
         ethernet = packet.get_header(Ethernet)
 
-
-	    else:
-            if packet[0].dst in mymacs:
-                log_debug ("Packet intended for me")
-                continue
+        if packet[0].dst in mymacs:
+            log_debug ("Packet intended for me")
+            continue
             
-            if ethernet.dst == BROADCAST
+        if ethernet.dst == BROADCAST
+            broadcast(net, packet, input_port)
+            continue
+
+        #loop through table
+        for entry in table:
+            if entry.addr == ethernet.dst:
+                net.send_packet(entry.port, packet)
+                matched = True
+
+            else:
+                insertEntry(port, ethernet.dst, size, table)
                 broadcast(net, packet, input_port)
-                continue
 
-            #loop through table
-            for entry in table:
-                if entry.addr == ethernet.dst:
-                    net.send_packet(entry.port, packet)
-                    matched = True
+        if matched == False:
+            broadcast(net, packet, input_port)
 
-                else:
-                    insertEntry(port, ethernet.dst, size, table)
-                    broadcast(net, packet, input_port)
-
-            if matched == False:
-                broadcast(net, packet, input_port)
 
         matched = False
 
