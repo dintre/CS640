@@ -25,9 +25,9 @@ def main(net):
     anythingAddr = "ef:ef:ef:ef:ef:ef"
 
     #find lowest port MAC for ID
-    for port in net.ports():
-        if id > port.name:
-            id = port.name
+    for port in net.interfaces():
+        #if id > port.ethaddr:
+            #id = port.ethaddr
 
     #at startup of switch, flood out packets on all ports
     # eth = Ethernet()
@@ -47,13 +47,9 @@ def main(net):
 
 
     while True:
-
         if idCurrentRoot == self:
-    	    'Building packet'
     	    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     	    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
-	
-
 
         try:
             timestamp,input_port,packet = net.recv_packet()
