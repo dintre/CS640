@@ -33,7 +33,7 @@ def main(net):
 
     #find lowest port MAC for ID
     for port in net.interfaces():
-        id = lesserId(id, port.ethaddr)
+        id = lesserId(id, str(port.ethaddr))
 
     #at startup of switch, flood out packets on all ports
     # eth = Ethernet()
@@ -45,7 +45,8 @@ def main(net):
 
     #Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     #pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
-    spm = SpanningTreeMessage("ID", hops_to_root=1)
+    # initially, both root id and source id are this host's id
+    spm = SpanningTreeMessage(id, 0, id)
     eth = Ethernet()
     eth.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     pkt = eth(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
