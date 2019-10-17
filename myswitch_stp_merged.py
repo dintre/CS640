@@ -26,9 +26,10 @@ def main(net):
     anythingAddr = "ef:ef:ef:ef:ef:ef"
 
     #find lowest port MAC for ID
-    #for port in net.interfaces():
-        #if id > port.ethaddr:
-            #id = port.ethaddr
+    for port in net.interfaces():
+        integerEthAddr = int(port.ethaddr.translate(None, "."), 16)
+        if id > integerEthAddr:
+            id = integerEthAddr
 
     #at startup of switch, flood out packets on all ports
     # eth = Ethernet()
