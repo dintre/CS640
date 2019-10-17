@@ -12,8 +12,14 @@ class tableEntry:
         self.port = port
         self.addr = addr
 
-    def incrementTTL(self):
-        self.ttl += 1
+
+def lesserId(idOne, idTwo):
+    
+    if idOne < idTwo:
+        return idOne
+    else:
+        return idTwo
+    
 
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
@@ -22,14 +28,12 @@ def main(net):
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
     matched = False
-    id = 100000000
+    id = "zzzzzzzzzzzzzzzzzzzzzz"
     anythingAddr = "ef:ef:ef:ef:ef:ef"
 
     #find lowest port MAC for ID
     for port in net.interfaces():
-        integerEthAddr = int(port.ethaddr.translate(None, "."), 16)
-        if id > integerEthAddr:
-            id = integerEthAddr
+        id = lesserId(id, port.ethaddr)
 
     #at startup of switch, flood out packets on all ports
     # eth = Ethernet()
@@ -103,9 +107,6 @@ def insertEntry(port, addr, size, table):
             size += 1
 
         table.insert(0, entry)
-
-        for x in table:
-            x.incrementTTL()
 
 class SpanningTreeMessage(PacketHeaderBase):
     _PACKFMT = "6sxB6s"
