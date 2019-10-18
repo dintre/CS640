@@ -67,6 +67,10 @@ def broadcast(net, recInfo):
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
+        for ent in table:
+            if ent.port == port:
+                ent.port = port
+
         entry = tableEntry(port, addr)
         if(size == 5):
             table.pop(4)
