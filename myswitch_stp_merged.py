@@ -41,8 +41,8 @@ def main(net):
     anythingAddr = "ef:ef:ef:ef:ef:ef"
     hops_to_root = 0
     timeLastSPM = 0
-    root_interface # a port
-    root_switch_id # an is is an ethaddr
+    root_interface = id # a port
+    root_switch_id = id # an is is an ethaddr
     blockedInterfaces = [] #list
 
     #find lowest port MAC for ID
@@ -66,6 +66,7 @@ def main(net):
 
         log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
         ethernet = packet.get_header(Ethernet)
+        spm = packet.get_header(SpanningTreeMessage)
 
         #spanning tree packet received check
         if packet[SpanningTreeMessage].root != None:
