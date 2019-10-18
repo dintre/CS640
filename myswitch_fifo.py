@@ -37,7 +37,7 @@ def main(net):
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
-            broadcast(net, recInfo)
+            size = broadcast(net, recInfo)
 
         else:
             #loop through table
@@ -70,6 +70,7 @@ def insertEntry(port, addr, size, table):
         for ent in table:
             if ent.port == port:
                 ent.port = port
+                return size
 
         entry = tableEntry(port, addr)
         if(size == 5):
@@ -78,3 +79,4 @@ def insertEntry(port, addr, size, table):
             size += 1
 
         table.insert(0, entry)
+        return size
