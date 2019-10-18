@@ -2,16 +2,15 @@
 from switchyard.lib.userlib import *
 import threading
 import struct
+from SpanningTreeMessage import SpanningTreeMessage
 
 class tableEntry:
     port = -1 
     addr = -1
-    ttl = 0
 
     def __init__(self, port, addr, ttl = 0):
         self.port = port
         self.addr = addr
-
 
 def lesserId(idOne, idTwo):
     
@@ -19,8 +18,18 @@ def lesserId(idOne, idTwo):
         return idOne
     else:
         return idTwo
-    
 
+def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
+    spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
+    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    pkt = Ethernet(src=hwsrc,
+                   dst=hwdst,
+                   ethertype=EtherType.SLOW) + spm
+    xbytes = pkt.to_bytes()
+    p = Packet(raw=xbytes)
+    return p
+
+    
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
     size = 0
@@ -30,34 +39,24 @@ def main(net):
     matched = False
     id = "zzzzzzzzzzzzzzzzzzzzzz"
     anythingAddr = "ef:ef:ef:ef:ef:ef"
+    idCurrentRoot = id
+    hops_to_root = 0
+    timeLastSPM = 0
+    root_interface
+    root_switch_id
+    blockedInterfaces = [] #list
 
     #find lowest port MAC for ID
     for port in net.interfaces():
         id = lesserId(id, str(port.ethaddr))
+        idCurrentRoot = id
 
     #at startup of switch, flood out packets on all ports
-    # eth = Ethernet()
-    # eth.src = anythingAddr
-    # eth.dst = BROADCAST
-    # spanMessage = SpanningTreeMessage()
-    # spanMessage += eth
-
-
-    #Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    #pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
-    # initially, both root id and source id are this host's id
-    spm = SpanningTreeMessage(id, 0, id)
-    eth = Ethernet()
-    eth.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    pkt = eth(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
+    pkt = createStpPacket(id, 0, id)
     broadcast(net, pkt)
 
 
     while True:
-        if idCurrentRoot == self:
-    	    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    	    pkt = Ethernet(src="ID",dst="ID",ethertype=EtherType.SLOW) + spm
-
         try:
             timestamp,input_port,packet = net.recv_packet()
         except NoPackets:
@@ -67,6 +66,46 @@ def main(net):
 
         log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
         ethernet = packet.get_header(Ethernet)
+
+        #spanning tree packet received check
+        if packet[SpanningTreeMessage].root != None:
+            timeLastSPM = timestamp
+            #first examin root's ID. If smaller than current root, check incoming interface with root interface
+            if packet[SpanningTreeMessage].root < idCurrentRoot:
+                #update switch information
+            else if input_port == root_interface:
+                #update switch information
+
+            #otherwise if packet root is greater than current root
+            else if packet[SpanningTreeMessage].root > idCurrentRoot:
+                #remove blocked interface
+                for intf in blockedInterfaces:
+                    if intf == input_port.name:
+                        blockedInterfaces.remove(intf)
+            #otherwise if ids match exactly
+            else if packet[SpanningTreeMessage].root == idCurrentRoot:
+                #examine number of hops to root
+                if packet[SpanningTreeMessage]._hops_to_root + 1 < hops_to_root:
+                    #remove blocked interface
+                    for intf in blockedInterfaces:
+                        if intf == input_port.name:
+                            blockedInterfaces.remove(intf)
+                    #block original root interface
+                    blockedInterfaces.append(root_interface)
+                    #update root interface to incoming interface
+                    root_interface = input_port
+                else if packet[SpanningTreeMessage.]._hops_to_root + 1 == hops_to_root and root_switch_id > packet[SpanningTreeMessage].switch_id:
+                    #remove blocked interface
+                    for intf in blockedInterfaces:
+                        if intf == input_port.name:
+                            blockedInterfaces.remove(intf)
+                    #block original root interface
+                    blockedInterfaces.append(root_interface)
+                    #update root interface to incoming interface
+                    root_interface = input_port
+                else:
+                    blockedInterfaces.append(root_interface)
+
 
         if packet[0].dst in mymacs:
             log_debug ("Packet intended for me")
@@ -108,53 +147,3 @@ def insertEntry(port, addr, size, table):
             size += 1
 
         table.insert(0, entry)
-
-class SpanningTreeMessage(PacketHeaderBase):
-    _PACKFMT = "6sxB6s"
-
-    # switch_id is the id of the switch that forwarded the stp packet
-    # in case the stp packet is generated ensure switch_id=root_id
-
-    def __init__(self, root_id="00:00:00:00:00:00", hops_to_root=0, switch_id="00:00:00:00:00:00", **kwargs):
-        self._root = EthAddr(root_id)
-        self._hops_to_root = hops_to_root
-        self._switch_id = EthAddr(switch_id)
-        PacketHeaderBase.__init__(self, **kwargs)
-
-    def to_bytes(self):
-        raw = struct.pack(self._PACKFMT, self._root.raw, self._hops_to_root, self._switch_id.raw)
-        return raw
-
-    def from_bytes(self, raw):
-        packsize = struct.calcsize(self._PACKFMT)
-        if len(raw) < packsize:
-            raise ValueError("Not enough bytes to unpack SpanningTreeMessage")
-        xroot,xhops, xswitch = struct.unpack(self._PACKFMT, raw[:packsize])
-        self._root = EthAddr(xroot)
-        self.hops_to_root = xhops
-        self._switch_id = EthAddr(xswitch)
-        return raw[packsize:]
-
-    @property
-    def hops_to_root(self):
-        return self._hops_to_root
-
-    @hops_to_root.setter
-    def hops_to_root(self, value):
-        self._hops_to_root = int(value)
-
-    @property
-    def switch_id(self):
-        return self._switch_id
-
-    @switch_id.setter
-    def switch_id(self, switch_id):
-        self._switch_id = switch_id
-
-    @property
-    def root(self):
-        return self._root
-
-    def __str__(self):
-        return "{} (root: {}, hops-to-root: {}, switch_id: {})".format(
-            self.__class__.__name__, self.root, self.hops_to_root, self.switch_id)
