@@ -72,10 +72,15 @@ def main(net):
             timeLastSPM = timestamp
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
             if packet[SpanningTreeMessage].root < idCurrentRoot:
-                #update switch information
+                #update switch information - step 4
+                hops_to_root = packet[SpanningTreeMessage]._hops_to_root + 1
+                packet[SpanningTreeMessage]._hops_to_root = hops_to_root + 1
+                root_interface = packet[SpanningTreeMessage]._root
             else if input_port == root_interface:
-                #update switch information
-
+                #update switch information - step 4
+                hops_to_root = packet[SpanningTreeMessage]._hops_to_root + 1
+                packet[SpanningTreeMessage]._hops_to_root = hops_to_root + 1
+                root_interface = packet[SpanningTreeMessage]._root
             #otherwise if packet root is greater than current root
             else if packet[SpanningTreeMessage].root > idCurrentRoot:
                 #remove blocked interface
