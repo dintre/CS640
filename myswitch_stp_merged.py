@@ -73,24 +73,24 @@ def main(net):
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
             if packet[SpanningTreeMessage].root < idCurrentRoot:
                 #update switch information - step 4
-                hops_to_root = packet[SpanningTreeMessage]._hops_to_root + 1
-                packet[SpanningTreeMessage]._hops_to_root = hops_to_root + 1
-                root_interface = packet[SpanningTreeMessage]._root
-            else if input_port == root_interface:
+                hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
+                packet[SpanningTreeMessage].hops_to_root = hops_to_root + 1
+                root_interface = packet[SpanningTreeMessage].root
+            elif input_port == root_interface:
                 #update switch information - step 4
-                hops_to_root = packet[SpanningTreeMessage]._hops_to_root + 1
-                packet[SpanningTreeMessage]._hops_to_root = hops_to_root + 1
-                root_interface = packet[SpanningTreeMessage]._root
+                hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
+                packet[SpanningTreeMessage].hops_to_root = hops_to_root + 1
+                root_interface = packet[SpanningTreeMessage].root
             #otherwise if packet root is greater than current root
-            else if packet[SpanningTreeMessage].root > idCurrentRoot:
+            elif packet[SpanningTreeMessage].root > idCurrentRoot:
                 #remove blocked interface
                 for intf in blockedInterfaces:
                     if intf == input_port.name:
                         blockedInterfaces.remove(intf)
             #otherwise if ids match exactly
-            else if packet[SpanningTreeMessage].root == idCurrentRoot:
+            elif packet[SpanningTreeMessage].root == idCurrentRoot:
                 #examine number of hops to root
-                if packet[SpanningTreeMessage]._hops_to_root + 1 < hops_to_root:
+                if packet[SpanningTreeMessage].hops_to_root + 1 < hops_to_root:
                     #remove blocked interface
                     for intf in blockedInterfaces:
                         if intf == input_port.name:
@@ -99,15 +99,16 @@ def main(net):
                     blockedInterfaces.append(root_interface)
                     #update root interface to incoming interface
                     root_interface = input_port
-                else if packet[SpanningTreeMessage.]._hops_to_root + 1 == hops_to_root and root_switch_id > packet[SpanningTreeMessage].switch_id:
-                    #remove blocked interface
-                    for intf in blockedInterfaces:
-                        if intf == input_port.name:
-                            blockedInterfaces.remove(intf)
-                    #block original root interface
-                    blockedInterfaces.append(root_interface)
-                    #update root interface to incoming interface
-                    root_interface = input_port
+                elif packet[SpanningTreeMessage.].hops_to_root + 1 == hops_to_root:
+                    if root_switch_id > packet[SpanningTreeMessage].switch_id:
+                        #remove blocked interface
+                        for intf in blockedInterfaces:
+                            if intf == input_port.name:
+                                blockedInterfaces.remove(intf)
+                        #block original root interface
+                        blockedInterfaces.append(root_interface)
+                        #update root interface to incoming interface
+                        root_interface = input_port
                 else:
                     blockedInterfaces.append(root_interface)
 
