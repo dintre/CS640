@@ -15,7 +15,7 @@ class tableEntry:
 
 def lesserId(idOne, idTwo):
     
-    if idOne < idTwo:
+    if str(idOne) < str(idTwo):
         return idOne
     else:
         return idTwo
@@ -48,8 +48,8 @@ def main(net):
     for port in net.interfaces():
         if id == None:
             id = port.ethaddr
-        elif:
-            id = lesserId(id, str(port.ethaddr))
+        else:
+            id = lesserId(id, port.ethaddr)
             root_interface = id
             #pdb.set_trace()
 
