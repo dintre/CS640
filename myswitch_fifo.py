@@ -37,6 +37,7 @@ def main(net):
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
+            size = insertEntry(input_port, ethernet.src, size, table)
             broadcast(net, packet, input_port)
 
         else:
@@ -48,9 +49,8 @@ def main(net):
                     matched = True
 
             if matched == False:
-                insertEntry(input_port, ethernet.dst, size, table)
+                size = insertEntry(input_port, ethernet.src, size, table)
                 log_info("Added a new table entry. ")
-                broadcast(net, packet, input_port)
                 broadcast(net, packet, input_port)
 
         matched = False
@@ -60,18 +60,18 @@ def main(net):
 
 def broadcast(net, packet, input_port):
     for port in net.ports():
-        if port != input_port:
+        if port.name != input_port:
             net.send_packet(port.name, packet)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         for ent in table:
             if ent.port == port:
-                ent.port = port
+                ent.addr = addr
                 return size
         entry = tableEntry(port, addr)
         if(size == 5):
-            table.pop(4)
+            table.pop()
         else:
             size += 1
         table.insert(0, entry)
