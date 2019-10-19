@@ -38,22 +38,24 @@ def main(net):
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
     matched = False
-    id = "zzzzzzzzzzzzzzzzzzzzzz"
-    anythingAddr = "ef:ef:ef:ef:ef:ef"
     hops_to_root = 0
     timeLastSPM = 0
-    root_interface = id # a port
-    root_switch_id = id # an is is an ethaddr
+    id = ethaddr
+
     blockedInterfaces = [] #list
 
     #find lowest port MAC for ID
     for port in net.interfaces():
-        id = lesserId(id, str(port.ethaddr))
-        root_interface = id
-        pdb.set_trace()
+        if id == None:
+            id = port.ethaddr
+        elif:
+            id = lesserId(id, str(port.ethaddr))
+            root_interface = id
+            #pdb.set_trace()
 
     #at startup of switch, flood out packets on all ports
-    root_switch_id = id
+    root_interface = id # a port
+    root_switch_id = id # an is is an ethaddr
     pkt = createStpPacket(id, 0, id)
     broadcast(net, pkt)
 
