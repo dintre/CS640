@@ -3,6 +3,7 @@ from switchyard.lib.userlib import *
 import threading
 import struct
 from SpanningTreeMessage import SpanningTreeMessage
+import pdb
 
 class tableEntry:
     port = -1 
@@ -19,7 +20,7 @@ def lesserId(idOne, idTwo):
     else:
         return idTwo
 
-def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
+def createStpPacket(self, root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
     spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
     Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     pkt = Ethernet(src=hwsrc,
@@ -49,6 +50,7 @@ def main(net):
     for port in net.interfaces():
         id = lesserId(id, str(port.ethaddr))
         root_interface = id
+        pdb.set_trace()
 
     #at startup of switch, flood out packets on all ports
     root_switch_id = id
@@ -143,7 +145,7 @@ def main(net):
 def broadcast(net, packet, input_port = ""):
     for port in net.ports():
         if port.name != input_port:
-            net.send_packet(port.name, packet)
+            net.send_packet(port.name, packet[SpanningTreeMessage])
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
