@@ -20,7 +20,7 @@ def lesserId(idOne, idTwo):
     else:
         return idTwo
 
-def createStpPacket(self, root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
+def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
     spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
     Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     pkt = Ethernet(src=hwsrc,
@@ -56,9 +56,8 @@ def main(net):
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
     root_switch_id = id # an is is an ethaddr
-    pkt = createStpPacket(id, 0, id)
-    broadcast(net, pkt)
-
+    pak = createStpPacket(id, 0, id)
+    broadcast(net, pak)
 
     while True:
         try:
@@ -122,39 +121,43 @@ def main(net):
             log_debug ("Packet intended for me")
             continue
             
+        #handle broadcasting
         if ethernet.dst == BROADCAST:
+            size = insertEntry(input_port, ethernet.src, size, table)
             broadcast(net, packet, input_port)
-            continue
 
-        #loop through table
-        for entry in table:
-            if entry.addr == ethernet.dst:
-                net.send_packet(entry.port, packet)
-                matched = True
+        else:
+            #loop through table
+            for entry in table:
+                if entry.addr == ethernet.dst:
+                    print("Matched in my table! ")
+                    net.send_packet(entry.port, packet)
+                    matched = True
 
-            else:
-                insertEntry(port, ethernet.dst, size, table)
+            if matched == False:
+                size = insertEntry(input_port, ethernet.src, size, table)
+                log_info("Added a new table entry. ")
                 broadcast(net, packet, input_port)
-
-        if matched == False:
-            broadcast(net, packet, input_port)
-
 
         matched = False
 
     net.shutdown()
 
-def broadcast(net, packet, input_port = ""):
+def broadcast(net, packet, input_port = None):
     for port in net.ports():
         if port.name != input_port:
-            net.send_packet(port.name, packet[SpanningTreeMessage])
+            net.send_packet(port.name, packet)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
+        for ent in table:
+            if ent.port == port:
+                ent.addr = addr
+                return size
         entry = tableEntry(port, addr)
         if(size == 5):
-            table.pop(4)
+            table.pop()
         else:
             size += 1
-
         table.insert(0, entry)
+        return size
