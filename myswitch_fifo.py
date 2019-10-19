@@ -18,7 +18,7 @@ def main(net):
 
     while True:
         try:
-            recInfo = net.recv_packet()
+            timestamp,input_port,packet = net.recv_packet()
         except NoPackets:
             continue
         except Shutdown:
@@ -26,7 +26,7 @@ def main(net):
 
         print("Current Packet: {}".format(net.name))
 
-        ethernet = recInfo.packet.get_header(Ethernet)
+        ethernet = packet.get_header(Ethernet)
         if ethernet is None:
             print("Received a non-Ethernet packet?!")
             continue
@@ -37,33 +37,33 @@ def main(net):
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
-            size = broadcast(net, recInfo)
+            size = broadcast(net, packet, input_port)
 
         else:
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
                     print("Matched in my table! ")
-                    net.send_packet(entry.port, recInfo.packet)
+                    net.send_packet(entry.port, packet)
                     matched = True
 
                 else:
-                    insertEntry(recInfo.port, ethernet.dst, size, table)
+                    insertEntry(port, ethernet.dst, size, table)
                     log_info("Added a new table entry. ")
-                    broadcast(net, recInfo)
+                    broadcast(net, packet, input_port)
 
             if matched == False:
-                broadcast(net, recInfo)
+                broadcast(net, packet, input_port)
 
         matched = False
 
     #Need to before ending program
     net.shutdown()
 
-def broadcast(net, recInfo):
+def broadcast(net, packet, input_port):
     for port in net.ports():
-        if port.name != recInfo.input_port:
-            net.send_packet(port.name, recInfo.packet)
+        if port != input_port:
+            net.send_packet(port, packet)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
