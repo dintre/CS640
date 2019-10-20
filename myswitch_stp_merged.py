@@ -29,7 +29,7 @@ def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="
     p = Packet(raw=xbytes)
     return p
 
-def timeWrapper(function, net, pak, input_port=none):
+def timeWrapper(function, net, pak, input_port=None):
     def wrapped():
         return function(net, pak, input_port)
     return wrapped
@@ -66,21 +66,20 @@ def main(net):
     tFunc = threading.Timer(2.0, wrappedFunc)
 
     while True:
+        if root_interface == id:
+            tFunc.start()
+            log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
+            pak = createStpPacket(id, 0, id)
+            broadcast(net, pak)
+        else:
+            tFunc.cancel()
+
         try:
             timestamp,input_port,packet = net.recv_packet()
         except NoPackets:
             continue
         except Shutdown:
             return
-
-
-        if root_interface == id:
-            fFunc.start()
-            log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
-            pak = createStpPacket(id, 0, id)
-            broadcast(net, pak)
-        else:
-            tFunc.cancel()
 
         #spanning tree packet received check
         if packet[SpanningTreeMessage].root != None:
@@ -158,9 +157,6 @@ def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
             net.send_packet(port.name, pkt)
-
-def broadcastSTPs(**kwargs):
-
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
