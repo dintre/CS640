@@ -60,28 +60,28 @@ def main(net):
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
     root_switch_id = id # an is is an ethaddr
-    #pak = createStpPacket(id, 0, id)
-    spm = SpanningTreeMessage(id, 0, id)
-    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-    pkt = Ethernet(src=id,
-                   dst=id,
-                   ethertype=EtherType.SLOW) + spm
-    xbytes = pkt.to_bytes()
-    p = Packet(raw=xbytes)
-    broadcast(net, p)
+    pak = createStpPacket(id, 0, id)
+    broadcast(net, pak)
 
     wrappedFunc = timeWrapper(broadcast, net, pak)
     tFunc = threading.Timer(2.0, wrappedFunc)
+    nonRootTimer = threading.Timer(10.0)
     notStarted = True
 
     while True:
         if root_interface == id:
-            if(notStarted):
+            if notStarted:
                 tFunc.start()
                 notStarted = False
         else:
-            tFunc.cancel()
-            notStarted = False
+            if notStarted == False:
+                tFunc.cancel()
+                notStarted = True
+            if timeLastSPM > timeLastSPM + 10:
+                #reset root to self with no blocked interfaces
+                root_interface = id
+                hops_to_root = 0
+                blockedInterfaces = []
 
         try:
             timestamp,input_port,packet = net.recv_packet()
