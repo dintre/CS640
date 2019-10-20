@@ -1,6 +1,7 @@
 
 from switchyard.lib.userlib import *
 import threading
+import time
 import struct
 from SpanningTreeMessage import SpanningTreeMessage
 import pdb
@@ -21,7 +22,7 @@ def lesserId(idOne, idTwo):
 
 def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
     spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
-    Ethernet.add_next_header_class(None, SpanningTreeMessage)
+    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
     pkt = Ethernet(src=hwsrc,
                    dst=hwdst,
                    ethertype=EtherType.SLOW) + spm
@@ -59,18 +60,28 @@ def main(net):
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
     root_switch_id = id # an is is an ethaddr
-    pak = createStpPacket(id, 0, id)
-    broadcast(net, pak)
+    #pak = createStpPacket(id, 0, id)
+    spm = SpanningTreeMessage(id, 0, id)
+    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    pkt = Ethernet(src=id,
+                   dst=id,
+                   ethertype=EtherType.SLOW) + spm
+    xbytes = pkt.to_bytes()
+    p = Packet(raw=xbytes)
+    broadcast(net, p)
 
     wrappedFunc = timeWrapper(broadcast, net, pak)
     tFunc = threading.Timer(2.0, wrappedFunc)
+    notStarted = True
 
     while True:
         if root_interface == id:
-            if(tfunc.is_alive() == False):
+            if(notStarted):
                 tFunc.start()
+                notStarted = False
         else:
             tFunc.cancel()
+            notStarted = False
 
         try:
             timestamp,input_port,packet = net.recv_packet()
