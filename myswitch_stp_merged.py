@@ -13,8 +13,7 @@ class tableEntry:
         self.port = port
         self.addr = addr
 
-def lesserId(idOne, idTwo):
-    
+def lesserId(idOne, idTwo): 
     if str(idOne) < str(idTwo):
         return idOne
     else:
@@ -22,7 +21,7 @@ def lesserId(idOne, idTwo):
 
 def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
     spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
-    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+    Ethernet.add_next_header_class(None, SpanningTreeMessage)
     pkt = Ethernet(src=hwsrc,
                    dst=hwdst,
                    ethertype=EtherType.SLOW) + spm
@@ -30,6 +29,10 @@ def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="
     p = Packet(raw=xbytes)
     return p
 
+def timeWrapper(function, net, pak, input_port=none):
+    def wrapped():
+        return function(net, pak, input_port)
+    return wrapped
     
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
@@ -59,6 +62,9 @@ def main(net):
     pak = createStpPacket(id, 0, id)
     broadcast(net, pak)
 
+    wrappedFunc = timeWrapper(broadcast, net, pak)
+    tFunc = threading.Timer(2.0, wrappedFunc)
+
     while True:
         try:
             timestamp,input_port,packet = net.recv_packet()
@@ -67,9 +73,14 @@ def main(net):
         except Shutdown:
             return
 
-        log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
-        ethernet = packet.get_header(Ethernet)
-        spm = packet.get_header(SpanningTreeMessage)
+
+        if root_interface == id:
+            fFunc.start()
+            log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
+            pak = createStpPacket(id, 0, id)
+            broadcast(net, pak)
+        else:
+            tFunc.cancel()
 
         #spanning tree packet received check
         if packet[SpanningTreeMessage].root != None:
@@ -143,10 +154,13 @@ def main(net):
 
     net.shutdown()
 
-def broadcast(net, packet, input_port = None):
+def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
-            net.send_packet(port.name, packet)
+            net.send_packet(port.name, pkt)
+
+def broadcastSTPs(**kwargs):
+
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
