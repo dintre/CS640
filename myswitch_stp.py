@@ -67,10 +67,8 @@ def main(net):
 
     while True:
         if root_interface == id:
-            tFunc.start()
-            log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
-            pak = createStpPacket(id, 0, id)
-            broadcast(net, pak)
+            if(tfunc.is_alive() == False):
+                tFunc.start()
         else:
             tFunc.cancel()
 
@@ -80,6 +78,8 @@ def main(net):
             continue
         except Shutdown:
             return
+
+        log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
 
         #spanning tree packet received check
         if packet[SpanningTreeMessage].root != None:
