@@ -96,13 +96,13 @@ def main(net):
             if packet[SpanningTreeMessage].root < root_interface:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
-                packet[SpanningTreeMessage].hops_to_root = hops_to_root + 1
+                packet[SpanningTreeMessage].hops_to_root = hops_to_root
                 root_interface = packet[SpanningTreeMessage].root
                 packet[SpanningTreeMessage].switch_id = id
             elif input_port == root_interface:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
-                packet[SpanningTreeMessage].hops_to_root = hops_to_root + 1
+                packet[SpanningTreeMessage].hops_to_root = hops_to_root
                 root_interface = packet[SpanningTreeMessage].root
             #otherwise if packet root is greater than current root
             elif packet[SpanningTreeMessage].root > root_interface:
