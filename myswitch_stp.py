@@ -1,10 +1,10 @@
-
 from switchyard.lib.userlib import *
 import threading
 import time
 import struct
 from SpanningTreeMessage import SpanningTreeMessage
 import pdb
+Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
 
 class tableEntry:
     port = -1 
@@ -20,9 +20,8 @@ def lesserId(idOne, idTwo):
     else:
         return idTwo
 
-def createStpPacket(root_id, hops, switch_id, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
-    spm = SpanningTreeMessage(root_id=root_id, hops_to_root=hops, switch_id=switch_id)
-    Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+def createStpPacket(root, hops, switch, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
+    spm = SpanningTreeMessage(root_id=root, hops_to_root=hops, switch_id=switch)
     pkt = Ethernet(src=hwsrc,
                    dst=hwdst,
                    ethertype=EtherType.SLOW) + spm
@@ -45,7 +44,6 @@ def main(net):
     hops_to_root = 0
     timeLastSPM = 0
     id = ethaddr
-
     blockedInterfaces = [] #list
 
     #find lowest port MAC for ID
@@ -59,13 +57,12 @@ def main(net):
 
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
-    root_switch_id = id # an is is an ethaddr
+    root_switch_id = id # an id is an ethaddr
     pak = createStpPacket(id, 0, id)
     broadcast(net, pak)
 
     wrappedFunc = timeWrapper(broadcast, net, pak)
     tFunc = threading.Timer(2.0, wrappedFunc)
-    nonRootTimer = threading.Timer(10.0)
     notStarted = True
 
     while True:
@@ -90,7 +87,7 @@ def main(net):
         except Shutdown:
             return
 
-        log_debug ("In {} received packet {} on {}".format(net.name, packet, input_port))
+        ethernet = packet.get_header(Ethernet)
 
         #spanning tree packet received check
         if packet[SpanningTreeMessage].root != None:
