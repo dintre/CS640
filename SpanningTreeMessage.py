@@ -2,7 +2,7 @@ from switchyard.lib.userlib import *
 import struct
 
 class SpanningTreeMessage(PacketHeaderBase):
-    _PACKFMT = "6sxB" 
+    _PACKFMT = "6sxBs6" 
 
     def __init__(self, root="00:00:00:00:00:00", **kwargs):
         self._root = EthAddr(root)
