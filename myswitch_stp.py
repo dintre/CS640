@@ -104,6 +104,7 @@ def main(net):
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
                 packet[SpanningTreeMessage].hops_to_root = hops_to_root
                 root_interface = packet[SpanningTreeMessage].root
+                packet[SpanningTreeMessage].switch_id = id
             #otherwise if packet root is greater than current root
             elif packet[SpanningTreeMessage].root > root_interface:
                 #remove blocked interface
