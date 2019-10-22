@@ -14,9 +14,7 @@ class tableEntry:
         self.port = port
         self.addr = addr
 
-def lesserId(idOne, idTwo):
-    if str(idOne) == str(idTwo):
-        return 1 
+def lesserId(idOne, idTwo): 
     if str(idOne) < str(idTwo):
         return idOne
     else:
@@ -53,11 +51,9 @@ def main(net):
         if id == None:
             id = port.ethaddr
         else:
-            if lesserId(id, port.ethaddr) == 1:
-                id = id
-            else:
-                id = lesserId(id, port.ethaddr)
-                root_interface = id
+            id = lesserId(id, port.ethaddr)
+            root_interface = id
+            #pdb.set_trace()
 
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
@@ -68,10 +64,8 @@ def main(net):
     notStarted = True
 
     while True:
-
-        if lesserId(root_interface, id) == 1:
+        if root_interface == id:
             if notStarted:
-                pak = createStpPacket(id, 0, id)
                 wrappedFunc = timeWrapper(broadcast, net, pak)
                 tFunc = threading.Timer(2.0, wrappedFunc)
                 tFunc.start()
@@ -99,26 +93,25 @@ def main(net):
         if packet[SpanningTreeMessage].root != None:
             timeLastSPM = timestamp
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
-            if packet[SpanningTreeMessage].root == lesserId(root_interface, packet[SpanningTreeMessage].root):
+            if packet[SpanningTreeMessage].root < root_interface:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
                 packet[SpanningTreeMessage].hops_to_root = hops_to_root
                 root_interface = packet[SpanningTreeMessage].root
                 packet[SpanningTreeMessage].switch_id = id
-            elif lesserId(input_port, root_interface) == 1:
+            elif packet[SpanningTreeMessage].switch_id == root_interface:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
                 packet[SpanningTreeMessage].hops_to_root = hops_to_root
                 root_interface = packet[SpanningTreeMessage].root
-                packet[SpanningTreeMessage].switch_id = id
             #otherwise if packet root is greater than current root
-            elif root_interface == lesserId(root_interface, packet[SpanningTreeMessage].root):
+            elif packet[SpanningTreeMessage].root > root_interface:
                 #remove blocked interface
                 for intf in blockedInterfaces:
                     if intf == input_port.name:
                         blockedInterfaces.remove(intf)
             #otherwise if ids match exactly
-            elif lesserId(packet[SpanningTreeMessage].root, root_interface) == 1:
+            elif packet[SpanningTreeMessage].root == root_interface:
                 #examine number of hops to root
                 if packet[SpanningTreeMessage].hops_to_root + 1 < hops_to_root:
                     #remove blocked interface
@@ -130,7 +123,7 @@ def main(net):
                     #update root interface to incoming interface
                     root_interface = input_port
                 elif packet[SpanningTreeMessage].hops_to_root + 1 == hops_to_root:
-                    if packet[SpanningTreeMessage].switch_id == lesserId(root_switch_id, packet[SpanningTreeMessage].switch_id):
+                    if root_switch_id > packet[SpanningTreeMessage].switch_id:
                         #remove blocked interface
                         for intf in blockedInterfaces:
                             if intf == input_port.name:
