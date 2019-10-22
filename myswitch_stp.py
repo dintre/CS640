@@ -61,13 +61,13 @@ def main(net):
     pak = createStpPacket(id, 0, id)
     broadcast(net, pak)
 
-    wrappedFunc = timeWrapper(broadcast, net, pak)
-    tFunc = threading.Timer(2.0, wrappedFunc)
     notStarted = True
 
     while True:
         if root_interface == id:
             if notStarted:
+                wrappedFunc = timeWrapper(broadcast, net, pak)
+                tFunc = threading.Timer(2.0, wrappedFunc)
                 tFunc.start()
                 notStarted = False
         else:
