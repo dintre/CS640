@@ -184,7 +184,7 @@ def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
             print(port.name)
-            if port not in blockedInterfaces :
+            if port.name not in blockedInterfaces :
                 print(port.name)
                 net.send_packet(port.name, pkt)
 
