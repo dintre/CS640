@@ -5,6 +5,7 @@ import struct
 from SpanningTreeMessage import SpanningTreeMessage
 import pdb
 Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
+blockedInterfaces = [] #list
 
 class tableEntry:
     port = -1 
@@ -44,7 +45,8 @@ def main(net):
     hops_to_root = 0
     timeLastSPM = 0
     id = ethaddr
-    blockedInterfaces = [] #list
+    global blockedInterfaces
+
 
     #find lowest port MAC for ID
     for port in net.interfaces():
@@ -88,9 +90,11 @@ def main(net):
             return
 
         ethernet = packet.get_header(Ethernet)
-
+        print(packet)
+        #pdb.set_trace()
         #spanning tree packet received check
-        if packet[SpanningTreeMessage].root != None:
+        #if packet[SpanningTreeMessage].root != None:
+        if packet.has_header(SpanningTreeMessage):
             timeLastSPM = timestamp
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
             if packet[SpanningTreeMessage].root < root_interface:
@@ -107,10 +111,14 @@ def main(net):
                 packet[SpanningTreeMessage].switch_id = id
             #otherwise if packet root is greater than current root
             elif packet[SpanningTreeMessage].root > root_interface:
+                print("debug")
+                #pdb.set_trace()
                 #remove blocked interface
                 for intf in blockedInterfaces:
                     if intf == input_port.name:
                         blockedInterfaces.remove(intf)
+                continue
+
             #otherwise if ids match exactly
             elif packet[SpanningTreeMessage].root == root_interface:
                 #examine number of hops to root
@@ -135,18 +143,21 @@ def main(net):
                         root_interface = input_port
                 else:
                     blockedInterfaces.append(root_interface)
+                continue
 
 
         if packet[0].dst in mymacs:
             log_debug ("Packet intended for me")
             continue
-            
+        print(packet)
+        #pdb.set_trace()
         #handle broadcasting
         if ethernet.dst == BROADCAST:
             size = insertEntry(input_port, ethernet.src, size, table)
             broadcast(net, packet, input_port)
 
         else:
+            #pdb.set_trace()
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
@@ -155,10 +166,10 @@ def main(net):
                     matched = True
 
             if matched == False:
+                pdb.set_trace()
                 size = insertEntry(input_port, ethernet.src, size, table)
                 log_info("Added a new table entry. ")
                 broadcast(net, packet, input_port)
-
         matched = False
 
     net.shutdown()
@@ -166,7 +177,8 @@ def main(net):
 def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
-            net.send_packet(port.name, pkt)
+            if port not in blockedInterfaces :
+                net.send_packet(port.name, pkt)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
