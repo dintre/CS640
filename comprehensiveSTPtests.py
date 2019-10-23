@@ -85,6 +85,26 @@ def hub_tests():
              "An Ethernet frame from 70:00:00:00:00:01 to 60:00:00:00:00:01 should arrive on eth2")
     s.expect(PacketOutputEvent("eth0", reqpkt, display=Ethernet),
              "Ethernet frame destined for 60:00:00:00:00:01 should be flooded out only on eth0")
+    
+    #----------------------------------------------------------------
+    #6. Receive new stp with same root and less hops (block eth1 in this case)
+    stp_pkt = mk_stp_pkt('10:00:00:00:00:01', 0, '10:00:00:00:00:01', hwsrc="10:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff")
+    s.expect(PacketInputEvent("eth0", stp_pkt), "Expecting STP packets on eth0: action to be forwarded")
+    
+    #8. Receive new stp with bigger root
+    stp_pkt = mk_stp_pkt('30:00:00:00:00:01', 0, '30:00:00:00:00:01', hwsrc="30:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff")
+    s.expect(PacketInputEvent("eth2", stp_pkt), "Expecting STP packets on eth2: action to be discarded")
+    #-----
+        # 10., 9.  A normal packet with destination not learnt should be sent out of ports eth0
+    reqpkt = mk_pkt("80:00:00:00:00:01", "40:00:00:00:00:01", '192.168.1.100', '172.16.42.2')
+    s.expect(PacketInputEvent("eth0", reqpkt, display=Ethernet),
+             "An Ethernet frame from 80:00:00:00:00:00 to 40:00:00:00:00:01 should arrive on eth0")
+    s.expect(PacketOutputEvent("eth2", reqpkt, display=Ethernet),
+             "Ethernet frame destined for 70:00:00:00:00:01 should be flooded out eth2")
+    
+    
+    
+    
 
     return s
 
