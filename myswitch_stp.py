@@ -116,7 +116,7 @@ def main(net):
             if countdownInProgress:
                 countFunc.cancel()
             wrappedCountdown = countWrapper(countdown, countedDown)
-            countFunc = threading.Timer(10.1, wrappedCountdown)
+            countFunc = threading.Timer(10.0, wrappedCountdown)
             countFunc.start()
             countdownInProgress = True
             countedDown[0] = False
