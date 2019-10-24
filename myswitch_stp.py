@@ -34,6 +34,15 @@ def timeWrapper(function, net, pak, input_port=None):
     def wrapped():
         return function(net, pak, input_port)
     return wrapped
+
+def countWrapper(function, array):
+    def wrapped():
+        return function(array)
+    return wrapped
+
+def countdown(array):
+    array[0] = True
+
     
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
@@ -46,7 +55,8 @@ def main(net):
     timeLastSPM = 0
     id = ethaddr
     global blockedInterfaces
-
+    countedDown[0] = False
+    countdownInProgress = False
 
     #find lowest port MAC for ID
     for port in net.interfaces():
@@ -66,12 +76,13 @@ def main(net):
     notStarted = False
 
     while True:
-        if timeLastSPM > timeLastSPM + 10:
+        if countedDown[0] == True:
             #reset root to self with no blocked interfaces
             root_interface = id
             root_switch_id = id
             hops_to_root = 0
             blockedInterfaces = []
+            countedDown[0] = False
 
         if root_switch_id == id:
             if notStarted:
@@ -95,11 +106,15 @@ def main(net):
 
         ethernet = packet.get_header(Ethernet)
         print(packet)
-        #pdb.set_trace()
         #spanning tree packet received check
-
         if packet.has_header(SpanningTreeMessage):
-            timeLastSPM = timestamp
+            if countdownInProgress:
+                countFunc.cancel()
+            wrappedCountdown = countWrapper(countdown, countedDown)
+            countFunc = threading.Timer(10.0, wrappedCountdown)
+            countFunc.start()
+            countdownInProgress = True
+            countedDown[0] = False
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
             if packet[SpanningTreeMessage].root < root_switch_id:
                 #update switch information - step 4
