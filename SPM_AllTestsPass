@@ -151,7 +151,7 @@ def main(net):
                         packet[SpanningTreeMessage].switch_id = id
                         root_switch_id = packet[SpanningTreeMessage].root
                 else:
-                    blockedInterfaces.append(root_interface)
+                    blockedInterfaces.append(input_port)
                     continue
 
 
