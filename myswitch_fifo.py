@@ -1,5 +1,5 @@
 from switchyard.lib.userlib import *
-
+#class to keep track of one individual entry in the FIFO forwarding table
 class tableEntry:
     port = -1 
     addr = -1
@@ -7,18 +7,18 @@ class tableEntry:
     def __init__(self, port, addr):
         self.port = port
         self.addr = addr
-
+#main code entry point
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
     size = 0
-    table = []
+    table = [] #FIFO forwarding table
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
     matched = False
 
     while True:
         try:
-            timestamp,input_port,packet = net.recv_packet()
+            recInfo = net.recv_packet()
         except NoPackets:
             continue
         except Shutdown:
@@ -26,7 +26,7 @@ def main(net):
 
         print("Current Packet: {}".format(net.name))
 
-        ethernet = packet.get_header(Ethernet)
+        ethernet = recInfo.packet.get_header(Ethernet)
         if ethernet is None:
             print("Received a non-Ethernet packet?!")
             continue
@@ -37,43 +37,47 @@ def main(net):
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
-            size = insertEntry(input_port, ethernet.src, size, table)
-            broadcast(net, packet, input_port)
+            broadcast(net, recInfo)
 
         else:
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
                     print("Matched in my table! ")
-                    net.send_packet(entry.port, packet)
+                    net.send_packet(entry.port, recInfo.packet)
                     matched = True
 
+                else:
+                    size = insertEntry(recInfo.port, ethernet.dst, size, table)
+                    log_info("Added a new table entry. ")
+                    broadcast(net, recInfo)
+
             if matched == False:
-                size = insertEntry(input_port, ethernet.src, size, table)
-                log_info("Added a new table entry. ")
-                broadcast(net, packet, input_port)
+                broadcast(net, recInfo)
 
         matched = False
 
     #Need to before ending program
     net.shutdown()
 
-def broadcast(net, packet, input_port):
+#send out all ports excepted received on port
+def broadcast(net, recInfo):
     for port in net.ports():
-        if port.name != input_port:
-            net.send_packet(port.name, packet)
+        if port.name != recInfo.input_port:
+            net.send_packet(port.name, recInfo.packet)
 
+#inserts a new entry or updates an entry in the FIFO forwarding table
 def insertEntry(port, addr, size, table):
-        #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         for ent in table:
             if ent.port == port:
-                ent.addr = addr
+                ent.port = port
                 return size
+
         entry = tableEntry(port, addr)
         if(size == 5):
-            table.pop()
+            table.pop(4)
         else:
             size += 1
+
         table.insert(0, entry)
         return size
-
