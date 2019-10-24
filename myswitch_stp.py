@@ -12,7 +12,7 @@ class tableEntry:
     port = -1 
     addr = -1
 
-    def __init__(self, port, addr, ttl = 0):
+    def __init__(self, port, addr):
         self.port = port
         self.addr = addr
 
@@ -45,7 +45,7 @@ def countWrapper(function, array):
         return function(array)
     return wrapped
 
-#after 10 seconds, this function is called to set countedDown[0] = True
+#after 10.1 seconds, this function is called to set countedDown[0] = True
 def countdown(array):
     array[0] = True
 
@@ -116,7 +116,7 @@ def main(net):
             if countdownInProgress:
                 countFunc.cancel()
             wrappedCountdown = countWrapper(countdown, countedDown)
-            countFunc = threading.Timer(10.0, wrappedCountdown)
+            countFunc = threading.Timer(10.1, wrappedCountdown)
             countFunc.start()
             countdownInProgress = True
             countedDown[0] = False
