@@ -11,14 +11,14 @@ class tableEntry:
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
     size = 0
-    table = [] #FIFO forwarding table
+    table = []
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
     matched = False
 
     while True:
         try:
-            recInfo = net.recv_packet()
+            timestamp,input_port,packet = net.recv_packet()
         except NoPackets:
             continue
         except Shutdown:
@@ -26,7 +26,7 @@ def main(net):
 
         print("Current Packet: {}".format(net.name))
 
-        ethernet = recInfo.packet.get_header(Ethernet)
+        ethernet = packet.get_header(Ethernet)
         if ethernet is None:
             print("Received a non-Ethernet packet?!")
             continue
@@ -37,23 +37,21 @@ def main(net):
 
         #handle broadcasting
         if ethernet.dst == BROADCAST:
-            broadcast(net, recInfo)
+            size = insertEntry(input_port, ethernet.src, size, table)
+            broadcast(net, packet, input_port)
 
         else:
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
                     print("Matched in my table! ")
-                    net.send_packet(entry.port, recInfo.packet)
+                    net.send_packet(entry.port, packet)
                     matched = True
 
-                else:
-                    size = insertEntry(recInfo.port, ethernet.dst, size, table)
-                    log_info("Added a new table entry. ")
-                    broadcast(net, recInfo)
-
             if matched == False:
-                broadcast(net, recInfo)
+                size = insertEntry(input_port, ethernet.src, size, table)
+                log_info("Added a new table entry. ")
+                broadcast(net, packet, input_port)
 
         matched = False
 
@@ -61,23 +59,23 @@ def main(net):
     net.shutdown()
 
 #send out all ports excepted received on port
-def broadcast(net, recInfo):
+def broadcast(net, packet, input_port):
     for port in net.ports():
-        if port.name != recInfo.input_port:
-            net.send_packet(port.name, recInfo.packet)
+        if port.name != input_port:
+            net.send_packet(port.name, packet)
 
 #inserts a new entry or updates an entry in the FIFO forwarding table
 def insertEntry(port, addr, size, table):
+        #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         for ent in table:
             if ent.port == port:
-                ent.port = addr
+                ent.addr = addr
                 return size
-
         entry = tableEntry(port, addr)
         if(size == 5):
-            table.pop(4)
+            table.pop()
         else:
             size += 1
-
         table.insert(0, entry)
         return size
+
