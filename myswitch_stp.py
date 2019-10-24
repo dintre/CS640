@@ -4,9 +4,10 @@ import time
 import struct
 from SpanningTreeMessage import SpanningTreeMessage
 import pdb
-Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage)
-blockedInterfaces = [] #list
+Ethernet.add_next_header_class(EtherType.SLOW, SpanningTreeMessage) #need this at global level
+blockedInterfaces = []
 
+#class to keep track of one individual entry in the FIFO forwarding table
 class tableEntry:
     port = -1 
     addr = -1
@@ -15,12 +16,14 @@ class tableEntry:
         self.port = port
         self.addr = addr
 
+#returns the smaller id given two addresses
 def lesserId(idOne, idTwo): 
     if str(idOne) < str(idTwo):
         return idOne
     else:
         return idTwo
 
+#instantiates a packet with Ethernet and Spanning Tree Message portions
 def createStpPacket(root, hops, switch, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:ff:ff:ff:ff"):
     spm = SpanningTreeMessage(root_id=root, hops_to_root=hops, switch_id=switch)
     pkt = Ethernet(src=hwsrc,
@@ -30,32 +33,34 @@ def createStpPacket(root, hops, switch, hwsrc="20:00:00:00:00:01", hwdst="ff:ff:
     p = Packet(raw=xbytes)
     return p
 
+#wrapper to hold the broadcast() function
 def timeWrapper(function, net, pak, input_port=None):
     def wrapped():
         return function(net, pak, input_port)
     return wrapped
 
+#wrapper to hold the countdown from 10 function
 def countWrapper(function, array):
     def wrapped():
         return function(array)
     return wrapped
 
+#after 10 seconds, this function is called to set countedDown[0] = True
 def countdown(array):
     array[0] = True
 
-    
+#main code entry point
 def main(net):
     BROADCAST = "ff:ff:ff:ff:ff:ff"
     size = 0
-    table = []
+    table = [] #FIFO forwarding table
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
     matched = False
     hops_to_root = 0
-    timeLastSPM = 0
     id = ethaddr
     global blockedInterfaces
-    countedDown[0] = False
+    countedDown = [False]
     countdownInProgress = False
 
     #find lowest port MAC for ID
@@ -176,12 +181,11 @@ def main(net):
                     blockedInterfaces.append(input_port)
                     continue
 
-
         if packet[0].dst in mymacs:
             log_debug ("Packet intended for me")
             continue
         print(packet)
-        #handle broadcasting
+        #handle broadcasting when explicit address
         if ethernet.dst == BROADCAST:
             size = insertEntry(input_port, ethernet.src, size, table)
             if packet.has_header(SpanningTreeMessage):
@@ -208,19 +212,21 @@ def main(net):
 
     net.shutdown()
 
+#send out all ports excepted received on port and blocked ports
 def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
             if port.name not in blockedInterfaces :
                 net.send_packet(port.name, pkt)
 
+#send out all ports excepted received on port
 def broadcastSPM(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
             net.send_packet(port.name, pkt)
 
+#inserts a new entry or updates an entry in the FIFO forwarding table
 def insertEntry(port, addr, size, table):
-        #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
         for ent in table:
             if ent.port == port:
                 ent.addr = addr
@@ -232,4 +238,5 @@ def insertEntry(port, addr, size, table):
             size += 1
         table.insert(0, entry)
         return size
+
 
