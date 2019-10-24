@@ -54,20 +54,29 @@ def main(net):
             id = port.ethaddr
         else:
             id = lesserId(id, port.ethaddr)
-            root_interface = id
-            #pdb.set_trace()
 
     #at startup of switch, flood out packets on all ports
     root_interface = id # a port
     root_switch_id = id # an id is an ethaddr
     pak = createStpPacket(id, 0, id)
-    broadcast(net, pak)
-
-    notStarted = True
+    broadcastSPM(net, pak)
+    wrappedFunc = timeWrapper(broadcast, net, pak)
+    tFunc = threading.Timer(2.0, wrappedFunc)
+    tFunc.start()
+    notStarted = False
 
     while True:
-        if root_interface == id:
+        if timeLastSPM > timeLastSPM + 10:
+            #reset root to self with no blocked interfaces
+            root_interface = id
+            root_switch_id = id
+            hops_to_root = 0
+            blockedInterfaces = []
+
+        if root_switch_id == id:
             if notStarted:
+                pak = createStpPacket(id, 0, id)
+                broadcastSPM(net, pak)
                 wrappedFunc = timeWrapper(broadcast, net, pak)
                 tFunc = threading.Timer(2.0, wrappedFunc)
                 tFunc.start()
@@ -76,11 +85,6 @@ def main(net):
             if notStarted == False:
                 tFunc.cancel()
                 notStarted = True
-            if timeLastSPM > timeLastSPM + 10:
-                #reset root to self with no blocked interfaces
-                root_interface = id
-                hops_to_root = 0
-                blockedInterfaces = []
 
         try:
             timestamp,input_port,packet = net.recv_packet()
@@ -93,71 +97,84 @@ def main(net):
         print(packet)
         #pdb.set_trace()
         #spanning tree packet received check
-        #if packet[SpanningTreeMessage].root != None:
+
         if packet.has_header(SpanningTreeMessage):
             timeLastSPM = timestamp
             #first examin root's ID. If smaller than current root, check incoming interface with root interface
-            if packet[SpanningTreeMessage].root < root_interface:
+            if packet[SpanningTreeMessage].root < root_switch_id:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
                 packet[SpanningTreeMessage].hops_to_root = hops_to_root
-                root_interface = packet[SpanningTreeMessage].root
+                root_interface = input_port
                 packet[SpanningTreeMessage].switch_id = id
-            elif packet[SpanningTreeMessage].switch_id == root_interface:
+                root_switch_id = packet[SpanningTreeMessage].root
+            elif input_port == root_interface:
                 #update switch information - step 4
                 hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
                 packet[SpanningTreeMessage].hops_to_root = hops_to_root
-                root_interface = packet[SpanningTreeMessage].root
+                root_interface = input_port
                 packet[SpanningTreeMessage].switch_id = id
+                root_switch_id = packet[SpanningTreeMessage].root
             #otherwise if packet root is greater than current root
-            elif packet[SpanningTreeMessage].root > root_interface:
+            elif packet[SpanningTreeMessage].root > id:
                 print("debug")
-                #pdb.set_trace()
                 #remove blocked interface
                 for intf in blockedInterfaces:
-                    if intf == input_port.name:
+                    if intf == input_port:
                         blockedInterfaces.remove(intf)
                 continue
 
             #otherwise if ids match exactly
-            elif packet[SpanningTreeMessage].root == root_interface:
+            elif packet[SpanningTreeMessage].root == root_switch_id:
                 #examine number of hops to root
                 if packet[SpanningTreeMessage].hops_to_root + 1 < hops_to_root:
                     #remove blocked interface
                     for intf in blockedInterfaces:
-                        if intf == input_port.name:
+                        if intf == input_port:
                             blockedInterfaces.remove(intf)
                     #block original root interface
                     blockedInterfaces.append(root_interface)
                     #update root interface to incoming interface
+                    #update switch information - step 4
+                    hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
+                    packet[SpanningTreeMessage].hops_to_root = hops_to_root
                     root_interface = input_port
+                    packet[SpanningTreeMessage].switch_id = id
+                    root_switch_id = packet[SpanningTreeMessage].root
                 elif packet[SpanningTreeMessage].hops_to_root + 1 == hops_to_root:
                     if root_switch_id > packet[SpanningTreeMessage].switch_id:
                         #remove blocked interface
                         for intf in blockedInterfaces:
-                            if intf == input_port.name:
+                            if intf == input_port:
                                 blockedInterfaces.remove(intf)
                         #block original root interface
                         blockedInterfaces.append(root_interface)
                         #update root interface to incoming interface
+                        #update switch information - step 4
+                        hops_to_root = packet[SpanningTreeMessage].hops_to_root + 1
+                        packet[SpanningTreeMessage].hops_to_root = hops_to_root
                         root_interface = input_port
+                        packet[SpanningTreeMessage].switch_id = id
+                        root_switch_id = packet[SpanningTreeMessage].root
                 else:
-                    blockedInterfaces.append(root_interface)
-                continue
+                    print("Blocked {}".format(input_port))
+                    blockedInterfaces.append(input_port)
+                    continue
 
 
         if packet[0].dst in mymacs:
             log_debug ("Packet intended for me")
             continue
         print(packet)
-        #pdb.set_trace()
         #handle broadcasting
         if ethernet.dst == BROADCAST:
             size = insertEntry(input_port, ethernet.src, size, table)
-            broadcast(net, packet, input_port)
+            if packet.has_header(SpanningTreeMessage):
+                broadcastSPM(net, packet, input_port)
+            else:
+                broadcast(net, packet, input_port)
 
         else:
-            #pdb.set_trace()
             #loop through table
             for entry in table:
                 if entry.addr == ethernet.dst:
@@ -166,10 +183,12 @@ def main(net):
                     matched = True
 
             if matched == False:
-                pdb.set_trace()
                 size = insertEntry(input_port, ethernet.src, size, table)
                 log_info("Added a new table entry. ")
-                broadcast(net, packet, input_port)
+                if packet.has_header(SpanningTreeMessage):
+                    broadcastSPM(net, packet, input_port)
+                else:
+                    broadcast(net, packet, input_port)
         matched = False
 
     net.shutdown()
@@ -177,8 +196,13 @@ def main(net):
 def broadcast(net, pkt, input_port = None):
     for port in net.ports():
         if port.name != input_port:
-            if port not in blockedInterfaces :
+            if port.name not in blockedInterfaces :
                 net.send_packet(port.name, pkt)
+
+def broadcastSPM(net, pkt, input_port = None):
+    for port in net.ports():
+        if port.name != input_port:
+            net.send_packet(port.name, pkt)
 
 def insertEntry(port, addr, size, table):
         #CHECK FOR DUPLICATE ENTRIES AND DELETE OLD ONE
@@ -193,3 +217,4 @@ def insertEntry(port, addr, size, table):
             size += 1
         table.insert(0, entry)
         return size
+
