@@ -76,3 +76,4 @@ def insertEntry(port, addr, size, table):
             size += 1
         table.insert(0, entry)
         return size
+
