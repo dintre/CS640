@@ -70,7 +70,7 @@ def broadcast(net, recInfo):
 def insertEntry(port, addr, size, table):
         for ent in table:
             if ent.port == port:
-                ent.port = port
+                ent.port = addr
                 return size
 
         entry = tableEntry(port, addr)
