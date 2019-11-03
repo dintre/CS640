@@ -9,14 +9,20 @@ import time
 from switchyard.lib.packet.util import *
 from switchyard.lib.userlib import *
 
+class ForwardingEntry(object):
+    def __init__(self, prefix, mask, portName, nextHopAddr = None):
+        self.prefix = prefix
+        self.mask = mask
+        self.nexthop = nextHopAddr
+        self.portName = portName
+
 class Router(object):
-
-
     def __init__(self, net):
         self.net = net
         # other initialization stuff here
         self.arp_table = {} #first initialize empty ARP table for IP-MAC pairs
         self.my_interfaces = net.interfaces()
+        self.fTable = {}
     def router_main(self):    
         '''
         Main method for router; we stay in a loop in this method, receiving
@@ -52,7 +58,20 @@ class Router(object):
                     sourceIP = arpPkt.targetprotoaddr
                     sourceEth = interface.ethaddr
                     arpReply = create_ip_arp_reply(sourceEth,targetEth,sourceIP,targetIP)
-                    self.net.send_packet(input_port,arpReply) 
+                    self.net.send_packet(input_port,arpReply)
+
+    def populateForwardingTable(self):
+        #net interfaces
+        for intf in self.my_interfaces:
+            self.fTable[intf.ipaddr] = ForwardingEntry(intf.ipaddr, intf.netmask, intf.name)
+
+        #read from file
+        '''172.16.0.0 255.255.0.0 192.168.1.2 router-eth0
+        172.16.128.0 255.255.192.0 10.10.0.254 router-eth1
+        172.16.64.0 255.255.192.0 10.10.1.254 router-eth1
+        10.100.0.0 255.255.0.0 172.16.42.2 router-eth2'''
+
+
 def main(net):
     '''
     Main entry point for router.  Just create Router
