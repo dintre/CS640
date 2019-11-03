@@ -23,6 +23,9 @@ class Router(object):
         self.arp_table = {} #first initialize empty ARP table for IP-MAC pairs
         self.my_interfaces = net.interfaces()
         self.fTable = {}
+        self.populateForwardingTable()
+        for x in self.fTable:
+            print(x.portName)
     def router_main(self):    
         '''
         Main method for router; we stay in a loop in this method, receiving
@@ -70,7 +73,13 @@ class Router(object):
         172.16.128.0 255.255.192.0 10.10.0.254 router-eth1
         172.16.64.0 255.255.192.0 10.10.1.254 router-eth1
         10.100.0.0 255.255.0.0 172.16.42.2 router-eth2'''
-
+        file = open("forwarding_table.txt", "r")
+        if file.mode == 'r':
+            fileData = file.readlines()
+            print("Reading entries into table...")
+            for line in fileData:
+                data = line.split(" ")
+                self.fTable[data[0]] = ForwardingEntry(data[0], data[1], data[3], data[2])
 
 def main(net):
     '''
