@@ -8,6 +8,7 @@ import os
 import time
 from switchyard.lib.packet.util import *
 from switchyard.lib.userlib import *
+import pdb
 
 class ForwardingEntry(object):
     def __init__(self, prefix, mask, portName, nextHopAddr = None):
@@ -24,8 +25,15 @@ class Router(object):
         self.my_interfaces = net.interfaces()
         self.fTable = {}
         self.populateForwardingTable()
+        print("printing my table's contents:")
         for x in self.fTable:
-            print(x.portName)
+            print(x)
+            print(self.fTable[x].portName)
+            print(type(self.fTable[x].prefix))
+            print(self.fTable[x].mask)
+            print(type(self.fTable[x].mask))
+            print()
+
     def router_main(self):    
         '''
         Main method for router; we stay in a loop in this method, receiving
@@ -44,15 +52,17 @@ class Router(object):
             if gotpkt:
                 log_debug("Got a packet: {}".format(str(pkt)))
 
+            print(pkt)
+
             if pkt.has_header(Arp):
-                matched = False
+                ARPMatched = False
                 arpPkt = pkt[Arp]
                 for interface in self.my_interfaces:
                     if interface.ipaddr == arpPkt.targetprotoaddr:
-                        matched = True
+                        ARPMatched = True
                         break
 
-                if matched == True:
+                if ARPMatched == True:
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     #send ARP reply
@@ -63,9 +73,61 @@ class Router(object):
                     arpReply = create_ip_arp_reply(sourceEth,targetEth,sourceIP,targetIP)
                     self.net.send_packet(input_port,arpReply)
 
+            if pkt.has_header(IPv4):
+                IPMatched = False
+                ipPkt = pkt[IPv4]
+                match = self.checkMatch(ipPkt)
+                if match != 0:
+                    ipPkt.ttl = ipPkt.ttl - 1 #decrement TTL
+                    eth = Ethernet()
+                    print(self.fTable[match])
+                    print(self.fTable[match].nexthop)
+                    #pdb.set_trace()
+                    eth.dst = pkt[Ethernet].src
+                    eth.ethertype = EtherType.IP
+                    p = Packet()
+                    p += eth
+                    p += ipPkt
+                    self.net.send_packet(self.fTable[match].portName,p)
+
+
+    def checkMatch(self, ipPkt):
+        #netaddr = IPv4Network(ipPkt.prefix + "/" + ipPkt.mask)
+        destAddr = IPv4Address(ipPkt.dst)
+        matchedEntry = False        
+        matchedLength = 1
+        matchedIP = 0
+        count = 0
+        for entry in self.fTable:
+            count = count + 1
+            print(count)
+            tableObj = self.fTable[entry]
+            mask = IPv4Address(tableObj.mask)
+            netPrefix = IPv4Address(tableObj.prefix)
+            print("Mask {}, netPrefix {}, destAddr {}".format(mask,netPrefix,destAddr))
+            if (int(mask) & int(destAddr)) == int(netPrefix):
+                print("In if matched...")
+                print("Table's ip prefix: ")
+                print(netPrefix)
+                print("packet's destination: ")
+                print(destAddr)
+                print("Table's port name: ")
+                print(self.fTable[entry].portName)
+                matchedEntry = True
+                netAddr = IPv4Network(tableObj.prefix + "/" + tableObj.mask)
+                newLength = netAddr.prefixlen
+                print("New Length: ")
+                print(newLength)
+                if newLength > matchedLength:
+                    matchedLength = newLength
+                    matchedIP = tableObj.prefix
+
+        return matchedIP
+
     def populateForwardingTable(self):
         #net interfaces
         for intf in self.my_interfaces:
+            #self.fTable[str(intf.ipaddr)] = ForwardingEntry(str(intf.ipaddr), str(intf.netmask), intf.name)
             self.fTable[intf.ipaddr] = ForwardingEntry(intf.ipaddr, intf.netmask, intf.name)
 
         #read from file
@@ -78,8 +140,10 @@ class Router(object):
             fileData = file.readlines()
             print("Reading entries into table...")
             for line in fileData:
+                line = line.strip("\n")
                 data = line.split(" ")
-                self.fTable[data[0]] = ForwardingEntry(data[0], data[1], data[3], data[2])
+                #self.fTable[data[0]] = ForwardingEntry(data[0], data[1], data[3], data[2])
+                self.fTable[data[0]] = ForwardingEntry(IPv4Network(data[0]), IPv4Network(data[1]), data[3], IPv4Network(data[2]))
 
 def main(net):
     '''
@@ -89,4 +153,5 @@ def main(net):
     r = Router(net)
     r.router_main()
     net.shutdown()
+
 
