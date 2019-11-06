@@ -76,12 +76,17 @@ class Router(object):
             if pkt.has_header(IPv4):
                 IPMatched = False
                 ipPkt = pkt[IPv4]
-                matchPort = self.checkPortsMatch(ipPkt)
-                if matchPort == True:
-                    continue
+                #look up IP destination address in forwarding table
+                matchIp = self.checkPortsMatch(ipPkt)
+                    
 
-                match = self.checkMatch(ipPkt)
-                if match != 0:
+                matchIp = self.checkMatch(ipPkt)
+                
+
+                noARP = self.checkForAddr(matchIp)
+
+                if noARP == 0:
+                    #arp_request = create_ip_arp_request(ipPkt.senderhwaddr,)
                     ipPkt.ttl = ipPkt.ttl - 1 #decrement TTL
                     eth = Ethernet()
                     eth.dst = pkt[Ethernet].src
@@ -89,20 +94,27 @@ class Router(object):
                     p = Packet()
                     p += eth
                     p += ipPkt
-                    self.net.send_packet(match,p)
+                    self.net.send_packet(matchIp,p)
+
+
+    def checkForAddr(self, destIp):
+        for x in self.arp_table:
+            if self.arp_table[x] == destIp:
+                return self.arp_table[x]
+        return 0
 
     def checkPortsMatch(self, ipPkt):
         destAddr = IPv4Address(ipPkt.dst)
         for entry in self.fTable:
             pre = IPv4Address(entry.prefix)
             if destAddr == pre:
-                return True
-        return False
+                return entry.prefix
+        return 0
 
     def checkMatch(self, ipPkt):
         destAddr = IPv4Address(ipPkt.dst)      
         matchedLength = 1
-        matchedPort = 0
+        matched = 0 #need to initialize return value 
         ct = 0
         for entry in self.fTable:
             ct = ct + 1
@@ -111,16 +123,17 @@ class Router(object):
                 continue
 
             netAddr = IPv4Network(entry.prefix + "/" + entry.mask)
-            prefixnet = IPv4Network(entry.prefix + "/" + str(netAddr.prefixlen))
+            #prefixnet = IPv4Network(entry.prefix + "/" + str(netAddr.prefixlen))
+            prefixnet = IPv4Network(entry.prefix)#.network_address
             if destAddr in prefixnet:
                 newLength = netAddr.prefixlen
                 print("New Length: ")
                 print(newLength)
                 if newLength > matchedLength:
                     matchedLength = newLength
-                    matchedPort = entry.portName
+                    matched = entry.nexthop
 
-        return matchedPort
+        return matched
 
     def populateForwardingTable(self):
         #net interfaces
