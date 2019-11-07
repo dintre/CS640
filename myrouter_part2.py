@@ -11,6 +11,12 @@ from switchyard.lib.userlib import *
 from switchyard.lib.address import *
 import pdb
 
+class QueueEntry(object):
+    def __init__(self, timeARPSent, packet):
+        self.retries = 0
+        self.timeARPSent = timeARPSent
+        self.packet = packet
+
 class ForwardingEntry(object):
     def __init__(self, prefix, mask, portName, nextHopAddr = None):
         self.prefix = prefix
@@ -25,6 +31,8 @@ class Router(object):
         self.my_interfaces = net.interfaces()
         self.fTable = []
         self.populateForwardingTable()
+        self.BROADCAST = "ff:ff:ff:ff:ff:ff"
+        self.queue = []
         print("printing my table's contents:")
         for x in self.fTable:
             print(x)
@@ -63,6 +71,13 @@ class Router(object):
                         break
 
                 if ARPMatched == True:
+                    if arpPkt.operation==ArpOperation.Reply:
+                        for q in self.queue:
+                            if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
+                                newpkt = q.packet
+                                newpkt[IPv4].ttl = newpkt[IPv4].ttl-1#decrement TTL
+                                self.net.send_packet(input_port,newpkt)
+
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     #send ARP reply
@@ -77,61 +92,63 @@ class Router(object):
                 IPMatched = False
                 ipPkt = pkt[IPv4]
                 #look up IP destination address in forwarding table
-                matchIp = self.checkPortsMatch(ipPkt)
-                    
-
-                matchIp = self.checkMatch(ipPkt)
+                #matchIp = self.checkPortsMatch(ipPkt)
+                matchEntry = self.checkMatch(ipPkt)
+                print(matchEntry.prefix)
                 
-
-                noARP = self.checkForAddr(matchIp)
+                noARP = self.checkForAddr(matchEntry)
 
                 if noARP == 0:
-                    #arp_request = create_ip_arp_request(ipPkt.senderhwaddr,)
-                    ipPkt.ttl = ipPkt.ttl - 1 #decrement TTL
-                    eth = Ethernet()
-                    eth.dst = pkt[Ethernet].src
-                    eth.ethertype = EtherType.IP
-                    p = Packet()
-                    p += eth
-                    p += ipPkt
-                    self.net.send_packet(matchIp,p)
+                    srchw = 1
+                    for intf in self.net.interfaces():
+                        #pdb.set_trace()
+                        if matchEntry.prefix == str(intf.ipaddr):
+                            srchw = intf.ethaddr
+
+                    #ether = Ethernet()
+                    #ether.src = srchw
+                    #ether.dst = self.BROADCAST
+                    #ether.ethertype = EtherType.ARP
+                    #targetmac = ethaddr
+                    sendarppkt = create_ip_arp_request(srchw,matchEntry.prefix,ipPkt.dst)
+                    self.net.send_packet(matchEntry.portName,sendarppkt)
+                    self.queue.append(QueueEntry(1,pkt))
+                    #ipPkt.ttl = ipPkt.ttl - 1 #decrement TTL
+                    #eth = Ethernet()
+                    #eth.dst = pkt[Ethernet].src
+                    #eth.ethertype = EtherType.IP
+                    #p = Packet()
+                    #p += eth
+                    #p += ipPkt
+                    #self.net.send_packet(matchIp,p)
 
 
-    def checkForAddr(self, destIp):
+    def checkForAddr(self, entry):
         for x in self.arp_table:
-            if self.arp_table[x] == destIp:
+            if self.arp_table[x] == entry.prefix:
                 return self.arp_table[x]
-        return 0
-
-    def checkPortsMatch(self, ipPkt):
-        destAddr = IPv4Address(ipPkt.dst)
-        for entry in self.fTable:
-            pre = IPv4Address(entry.prefix)
-            if destAddr == pre:
-                return entry.prefix
         return 0
 
     def checkMatch(self, ipPkt):
         destAddr = IPv4Address(ipPkt.dst)      
         matchedLength = 1
         matched = 0 #need to initialize return value 
-        ct = 0
-        for entry in self.fTable:
-            ct = ct + 1
-            print(ct)
-            if entry.nexthop == None:
-                continue
 
-            netAddr = IPv4Network(entry.prefix + "/" + entry.mask)
-            #prefixnet = IPv4Network(entry.prefix + "/" + str(netAddr.prefixlen))
-            prefixnet = IPv4Network(entry.prefix)#.network_address
-            if destAddr in prefixnet:
+        for entry in self.fTable:         
+            netAddr = IPv4Network(entry.prefix + "/" + entry.mask,strict=False)
+            prefixnet = IPv4Network(entry.prefix + "/" + str(netAddr.prefixlen),strict=False)
+            #prefixnet = IPv4Network(entry.prefix,strict=False)
+            #prefixnet = ipaddress.ip_network(entry.prefix,strict=False)
+            destprefix = IPv4Address(destAddr)
+            print(prefixnet)
+            print(destprefix)
+            if destprefix in prefixnet:
                 newLength = netAddr.prefixlen
                 print("New Length: ")
                 print(newLength)
                 if newLength > matchedLength:
                     matchedLength = newLength
-                    matched = entry.nexthop
+                    matched = entry
 
         return matched
 
