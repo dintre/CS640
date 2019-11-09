@@ -53,15 +53,33 @@ def router_tests():
     packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.168.1.100', ipdst = '172.19.42.1')
     s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.19.42.1 should arrive on router-eth0")
 
-    #3 TODO - make a packet that matches in fTable. Needs ARP request. tries 3 times and stops
-    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.168.1.100', ipdst = '172.19.42.1')
-    s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.19.42.1 should arrive on router-eth0")
+    #3 packet that matches in fTable. Needs ARP request. tries 3 times and stops
+    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.16.42.2', ipdst = '172.16.42.2')
+    s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.19.42.2 should arrive on router-eth0")
+
+    #3.2
+    #         out router-eth2
+    arp_request  = create_ip_arp_request('10:00:00:00:00:03', '172.16.42.1', '172.16.42.2')
+    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 172.16.42.2 out router-eth2 interface")
+
+    #3.3
+    s.expect(PacketInputTimeoutEvent(1), "Waiting 1 seconds")
+
+    #3.4
+    #arp_request  = create_ip_arp_request('10:00:00:00:00:03', '172.16.42.1', '172.16.42.2')
+    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 172.16.42.2 out router-eth2 interface")
+
+    #3.5
+    s.expect(PacketInputTimeoutEvent(1), "Waiting 1 seconds")
+
+    #3.6
+    #arp_request  = create_ip_arp_request('10:00:00:00:00:03', '172.16.42.1', '172.16.42.2')
+    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 172.16.42.2 out router-eth2 interface")
 
 
-
-    #s.expect(PacketInputTimeoutEvent(10), "Waiting 10 seconds")
 
 
     return s
 
 scenario = router_tests()
+
