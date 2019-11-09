@@ -86,12 +86,12 @@ class Router(object):
                     for buf in self.buffer:
                         if buf.nexthop == entry.nexthop:
                             self.buffer.remove(buf)
-                    continue
+            for entry in self.queue:
                 #if it's been 1 second for in-progress request, resend it
                 if time.time() - entry.timeARPSent >= 1:
                     entry.tries = entry.tries + 1
                     self.net.send_packet(entry.outputPort,entry.arpPkt)
-                    continue
+                    
 
 #-----------Received DynamicRoutingMessage packet handling--------------------------------------------
             if pkt.has_header(DynamicRoutingMessage):
