@@ -56,8 +56,6 @@ class Router(object):
         '''
         while True:
             gotpkt = True
-            ARPHandled = False
-            IPv4Handled = False
             try:
                 timestamp,input_port,pkt = self.net.recv_packet(timeout=1.0)
             except NoPackets:
