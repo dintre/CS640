@@ -12,10 +12,12 @@ from switchyard.lib.address import *
 import pdb
 
 class QueueEntry(object):
-    def __init__(self, timeARPSent, packet):
-        self.retries = 0
+    def __init__(self, timeARPSent, packet, arpPkt, outputPort):
+        self.tries = 1
         self.timeARPSent = timeARPSent
         self.packet = packet
+        self.arpPkt = arpPkt
+        self.outputPort = outputPort
 
 class ForwardingEntry(object):
     def __init__(self, prefix, mask, portName, nextHopAddr = None):
@@ -33,14 +35,6 @@ class Router(object):
         self.populateForwardingTable()
         self.BROADCAST = "ff:ff:ff:ff:ff:ff"
         self.queue = []
-        print("printing my table's contents:")
-        for x in self.fTable:
-            print(x)
-            print(x.prefix)
-            print(x.mask)
-            print(x.portName)
-            print(x.nexthop)
-            print()
 
     def router_main(self):    
         '''
@@ -60,7 +54,18 @@ class Router(object):
             if gotpkt:
                 log_debug("Got a packet: {}".format(str(pkt)))
 
+            print()
+            print(time.time())
             print(pkt)
+
+            #check for how long entries have been waiting
+            for entry in self.queue:
+                if entry.tries > 3:
+                    self.queue.remove(entry)
+                    continue
+                if time.time() - entry.timeARPSent >= 1:
+                    entry.tries = entry.tries + 1
+                    self.net.send_packet(entry.outputPort,entry.arpPkt)
 
             if pkt.has_header(Arp):
                 ARPMatched = False
@@ -72,11 +77,15 @@ class Router(object):
 
                 if ARPMatched == True:
                     if arpPkt.operation==ArpOperation.Reply:
+                        doneReply = False
                         for q in self.queue:
                             if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
                                 newpkt = q.packet
                                 newpkt[IPv4].ttl = newpkt[IPv4].ttl-1#decrement TTL
                                 self.net.send_packet(input_port,newpkt)
+                                doneReply = True
+                    if doneReply == True:
+                        continue
 
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
@@ -91,43 +100,52 @@ class Router(object):
             if pkt.has_header(IPv4):
                 IPMatched = False
                 ipPkt = pkt[IPv4]
+                #first look for dest==this router's port ip
+                selfMatch = self.checkThisRouter(ipPkt)
+                if selfMatch == True:
+                    continue
                 #look up IP destination address in forwarding table
-                #matchIp = self.checkPortsMatch(ipPkt)
                 matchEntry = self.checkMatch(ipPkt)
-                print(matchEntry.prefix)
+                if matchEntry == 0:
+                    print("No match in forwarding table; dropping packet.")
+                    continue #if nothing in forwarding table, return to top of loop
                 
-                noARP = self.checkForAddr(matchEntry)
+                hasARPAlready = self.checkForAddr(matchEntry)
 
-                if noARP == 0:
+                if hasARPAlready != 0:
+                    ipPkt.ttl = ipPkt.ttl - 1#Decrement TTL by 1
+                    outputPort = findPort(hasARPAlready)
+                    self.net.send_packet(outputPort,pkt)
+
+                if hasARPAlready == 0:
                     srchw = 1
                     for intf in self.net.interfaces():
-                        #pdb.set_trace()
                         if matchEntry.prefix == str(intf.ipaddr):
                             srchw = intf.ethaddr
 
-                    #ether = Ethernet()
-                    #ether.src = srchw
-                    #ether.dst = self.BROADCAST
-                    #ether.ethertype = EtherType.ARP
-                    #targetmac = ethaddr
                     sendarppkt = create_ip_arp_request(srchw,matchEntry.prefix,ipPkt.dst)
                     self.net.send_packet(matchEntry.portName,sendarppkt)
-                    self.queue.append(QueueEntry(1,pkt))
-                    #ipPkt.ttl = ipPkt.ttl - 1 #decrement TTL
-                    #eth = Ethernet()
-                    #eth.dst = pkt[Ethernet].src
-                    #eth.ethertype = EtherType.IP
-                    #p = Packet()
-                    #p += eth
-                    #p += ipPkt
-                    #self.net.send_packet(matchIp,p)
+                    self.queue.append(QueueEntry(time.time(),pkt,sendarppkt,matchEntry.portName))
 
+    def findPort(self, entry):
+        for port in self.my_interfaces:
+            if port.ethaddr == entry:
+                return port.name
+        return 0
 
     def checkForAddr(self, entry):
         for x in self.arp_table:
-            if self.arp_table[x] == entry.prefix:
+            if self.arp_table[x] == entry.prefix:        
                 return self.arp_table[x]
         return 0
+
+    def checkThisRouter(self, ipPkt):
+        destAddr = IPv4Address(ipPkt.dst)
+        for port in self.my_interfaces:
+            if destAddr == port.ipaddr:
+                print("Destination is this router's port; dropping packet")
+                return True
+        return False
 
     def checkMatch(self, ipPkt):
         destAddr = IPv4Address(ipPkt.dst)      
@@ -137,15 +155,9 @@ class Router(object):
         for entry in self.fTable:         
             netAddr = IPv4Network(entry.prefix + "/" + entry.mask,strict=False)
             prefixnet = IPv4Network(entry.prefix + "/" + str(netAddr.prefixlen),strict=False)
-            #prefixnet = IPv4Network(entry.prefix,strict=False)
-            #prefixnet = ipaddress.ip_network(entry.prefix,strict=False)
             destprefix = IPv4Address(destAddr)
-            print(prefixnet)
-            print(destprefix)
             if destprefix in prefixnet:
                 newLength = netAddr.prefixlen
-                print("New Length: ")
-                print(newLength)
                 if newLength > matchedLength:
                     matchedLength = newLength
                     matched = entry
@@ -158,10 +170,6 @@ class Router(object):
             self.fTable.append(ForwardingEntry(str(intf.ipaddr), str(intf.netmask), intf.name))
 
         #read from file
-        '''172.16.0.0 255.255.0.0 192.168.1.2 router-eth0
-        172.16.128.0 255.255.192.0 10.10.0.254 router-eth1
-        172.16.64.0 255.255.192.0 10.10.1.254 router-eth1
-        10.100.0.0 255.255.0.0 172.16.42.2 router-eth2'''
         file = open("forwarding_table.txt", "r")
         if file.mode == 'r':
             fileData = file.readlines()
