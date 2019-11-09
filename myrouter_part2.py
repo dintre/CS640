@@ -11,6 +11,15 @@ from switchyard.lib.userlib import *
 from switchyard.lib.address import *
 import pdb
 
+#bufferEntries are packets waiting for an ARP reply
+#to an destination that's already been requested
+class BufferEntry(object):
+    def __init__(self,packet,next):
+        self.packet = packet
+        self.nexthop = next
+
+#Queue objects hold data about ARP packets that have been requested
+#and are being waited on
 class QueueEntry(object):
     def __init__(self, timeARPSent, packet, arpPkt, outputPort):
         self.tries = 1
@@ -19,6 +28,7 @@ class QueueEntry(object):
         self.arpPkt = arpPkt
         self.outputPort = outputPort
 
+#Object for an entry in the forwarding table of the router
 class ForwardingEntry(object):
     def __init__(self, prefix, mask, portName, nextHopAddr = None):
         self.prefix = prefix
@@ -26,7 +36,9 @@ class ForwardingEntry(object):
         self.nexthop = nextHopAddr
         self.portName = portName
 
+#Object holding data about the router itself
 class Router(object):
+    #constructor
     def __init__(self, net):
         self.net = net
         self.arp_table = {} #first initialize empty ARP table for IP-MAC pairs
@@ -35,6 +47,7 @@ class Router(object):
         self.populateForwardingTable()
         self.BROADCAST = "ff:ff:ff:ff:ff:ff"
         self.queue = []
+        self.buffer = []
 
     def router_main(self):    
         '''
@@ -43,6 +56,8 @@ class Router(object):
         '''
         while True:
             gotpkt = True
+            ARPHandled = False
+            IPv4Handled = False
             try:
                 timestamp,input_port,pkt = self.net.recv_packet(timeout=1.0)
             except NoPackets:
@@ -58,18 +73,24 @@ class Router(object):
             print(time.time())
             print(pkt)
 
-            #check for how long entries have been waiting
+            #check for how long ARP entries have been waiting
             for entry in self.queue:
+                #if it's been treid 3 times, drop it and dequeue.
                 if entry.tries > 3:
                     self.queue.remove(entry)
                     continue
+                #if it's been 1 second for in-progress request, resend it
                 if time.time() - entry.timeARPSent >= 1:
                     entry.tries = entry.tries + 1
                     self.net.send_packet(entry.outputPort,entry.arpPkt)
+                    continue
 
+#-----------Received ARP packet handling--------------------------------------------
             if pkt.has_header(Arp):
                 ARPMatched = False
                 arpPkt = pkt[Arp]
+                doneReply = False
+
                 for interface in self.my_interfaces:
                     if interface.ipaddr == arpPkt.targetprotoaddr:
                         ARPMatched = True
@@ -77,56 +98,77 @@ class Router(object):
 
                 if ARPMatched == True:
                     if arpPkt.operation==ArpOperation.Reply:
-                        doneReply = False
-                        for q in self.queue:
+                        for q in self.queue:                            
                             if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
-                                newpkt = q.packet
-                                newpkt[IPv4].ttl = newpkt[IPv4].ttl-1#decrement TTL
-                                self.net.send_packet(input_port,newpkt)
+                                self.queue.remove(q)
+                                for buf in self.buffer:
+                                    if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
+                                        newpkt = buf.packet
+                                        newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
+                                        self.net.send_packet(input_port,newpkt)
                                 doneReply = True
-                    if doneReply == True:
-                        continue
 
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
+                    if doneReply == True:
+                        break
+
                     #send ARP reply
-                    targetEth = arpPkt.senderhwaddr
-                    targetIP = arpPkt.senderprotoaddr
-                    sourceIP = arpPkt.targetprotoaddr
-                    sourceEth = interface.ethaddr
-                    arpReply = create_ip_arp_reply(sourceEth,targetEth,sourceIP,targetIP)
-                    self.net.send_packet(input_port,arpReply)
+                    if arpPkt.operation==ArpOperation.Request:
+                        targetEth = arpPkt.senderhwaddr
+                        targetIP = arpPkt.senderprotoaddr
+                        sourceIP = arpPkt.targetprotoaddr
+                        sourceEth = interface.ethaddr
+                        arpReply = create_ip_arp_reply(sourceEth,targetEth,sourceIP,targetIP)
+                        self.net.send_packet(input_port,arpReply)
+
+#-----------IPv4 packet handling--------------------------------------------
 
             if pkt.has_header(IPv4):
-                IPMatched = False
                 ipPkt = pkt[IPv4]
                 #first look for dest==this router's port ip
                 selfMatch = self.checkThisRouter(ipPkt)
                 if selfMatch == True:
                     continue
+
                 #look up IP destination address in forwarding table
                 matchEntry = self.checkMatch(ipPkt)
                 if matchEntry == 0:
                     print("No match in forwarding table; dropping packet.")
                     continue #if nothing in forwarding table, return to top of loop
                 
+                #check if ARP table already contains this pair
                 hasARPAlready = self.checkForAddr(matchEntry)
 
+                #if ARP table does have the pair,
+                #send the packet out the correct port
                 if hasARPAlready != 0:
-                    ipPkt.ttl = ipPkt.ttl - 1#Decrement TTL by 1
+                    ipPkt.ttl = ipPkt.ttl - 1
                     outputPort = findPort(hasARPAlready)
                     self.net.send_packet(outputPort,pkt)
 
+                #if ARP table does NOT have the pair,
+                #create an ARP request and send it. Also enqueue it.
                 if hasARPAlready == 0:
+                    bufMatch = 0
+                    for buf in self.buffer:
+                        if buf.nexthop == matchEntry.nexthop:
+                            bufMatch = 1
+                    if bufMatch == 1:
+                        self.buffer.append(BufferEntry(pkt,matchEntry.nexthop))                    
+                        continue
                     srchw = 1
                     for intf in self.net.interfaces():
                         if matchEntry.prefix == str(intf.ipaddr):
                             srchw = intf.ethaddr
-
                     sendarppkt = create_ip_arp_request(srchw,matchEntry.prefix,ipPkt.dst)
                     self.net.send_packet(matchEntry.portName,sendarppkt)
                     self.queue.append(QueueEntry(time.time(),pkt,sendarppkt,matchEntry.portName))
+                    self.buffer.append(BufferEntry(pkt,matchEntry.nexthop))
 
+
+
+    #Other router methods
     def findPort(self, entry):
         for port in self.my_interfaces:
             if port.ethaddr == entry:
@@ -187,6 +229,7 @@ def main(net):
     r = Router(net)
     r.router_main()
     net.shutdown()
+
 
 
 
