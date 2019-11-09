@@ -83,9 +83,8 @@ class Router(object):
                 if entry.tries >= 3:
                     self.queue.remove(entry)
                     #remove related buffer entries
-                    for buf in self.buffer:
-                        if buf.nexthop == entry.nexthop:
-                            self.buffer.remove(buf)
+                    self.buffer.clear()
+                    
             for entry in self.queue:
                 #if it's been 1 second for in-progress request, resend it
                 if time.time() - entry.timeARPSent >= 1:
