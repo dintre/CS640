@@ -80,7 +80,7 @@ class Router(object):
             #check for how long ARP entries have been waiting
             for entry in self.queue:
                 #if it's been treid 3 times, drop it and dequeue.
-                if entry.tries > 3:
+                if entry.tries >= 3:
                     self.queue.remove(entry)
                     #remove related buffer entries
                     for buf in self.buffer:
