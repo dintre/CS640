@@ -129,7 +129,7 @@ class Router(object):
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     if doneReply == True:
-                        break
+                        continue
 
                     #send ARP reply
                     if arpPkt.operation==ArpOperation.Request:
