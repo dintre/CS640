@@ -25,12 +25,13 @@ class BufferEntry(object):
 #Queue objects hold data about ARP packets that have been requested
 #and are being waited on
 class QueueEntry(object):
-    def __init__(self, timeARPSent, packet, arpPkt, outputPort):
+    def __init__(self, timeARPSent, packet, arpPkt, outputPort, next):
         self.tries = 1
         self.timeARPSent = timeARPSent
         self.packet = packet
         self.arpPkt = arpPkt
         self.outputPort = outputPort
+        self.nexthop = next
 
 #Object for an entry in the forwarding table of the router
 class ForwardingEntry(object):
@@ -81,6 +82,10 @@ class Router(object):
                 #if it's been treid 3 times, drop it and dequeue.
                 if entry.tries > 3:
                     self.queue.remove(entry)
+                    #remove related buffer entries
+                    for buf in self.buffer:
+                        if buf.nexthop == entry.nexthop:
+                            self.buffer.remove(buf)
                     continue
                 #if it's been 1 second for in-progress request, resend it
                 if time.time() - entry.timeARPSent >= 1:
