@@ -296,16 +296,19 @@ class Router(object):
         for intf in self.my_interfaces:
             self.fTable.append(ForwardingEntry(str(intf.ipaddr), str(intf.netmask), intf.name))
 
-        #read from file
-        file = open("forwarding_table.txt", "r")
-        if file.mode == 'r':
-            fileData = file.readlines()
-            print("Reading entries into table...")
-            for line in fileData:
-                line = line.strip("\n")
-                data = line.split(" ")
-                self.fTable.append(ForwardingEntry(data[0], data[1], data[3], data[2]))
-
+        try:
+            #read from file
+            file = open("forwarding_table.txt", "r")
+            if file.mode == 'r':
+                fileData = file.readlines()
+                print("Reading entries into table...")
+                for line in fileData:
+                    line = line.strip("\n")
+                    data = line.split(" ")
+                    self.fTable.append(ForwardingEntry(data[0], data[1], data[3], data[2]))
+        except IOError:
+            print("Could not read a file.")
+                    
 def main(net):
     '''
     Main entry point for router.  Just create Router
