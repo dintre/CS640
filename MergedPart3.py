@@ -129,6 +129,7 @@ class Router(object):
                                         newpkt = buf.packet
                                         newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
                                         self.net.send_packet(input_port,newpkt)
+                                self.buffer.clear()
                                 doneReply = True
 
                     #store in ARP table
