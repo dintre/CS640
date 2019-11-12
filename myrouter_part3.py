@@ -78,6 +78,24 @@ class Router(object):
             print(pkt)
             print(input_port)
 
+            #check if this packet is reply we've needed
+            if pkt.has_header(Arp):
+                arpPkt = pkt[Arp]
+                ARPMatched = False
+                if arpPkt.operation==ArpOperation.Reply:
+                    for q in self.queue:                        
+                        if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
+                            self.queue.remove(q)
+                            for buf in self.buffer:
+                                if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
+                                    newpkt = buf.packet
+                                    newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
+                                    self.net.send_packet(input_port,newpkt)
+                            self.buffer.clear()
+                            ARPMatched = True
+                if ARPMatched == True:
+                    continue
+
             #check for how long ARP entries have been waiting
             for entry in self.queue:
                 #if it's been treid 3 times, drop it and dequeue.
@@ -87,6 +105,7 @@ class Router(object):
                     self.buffer.clear()
                     
             for entry in self.queue:
+                print(entry.packet)
                 #if it's been 1 second for in-progress request, resend it
                 if time.time() - entry.timeARPSent >= 1:
                     entry.tries = entry.tries + 1
@@ -113,25 +132,12 @@ class Router(object):
                 ARPMatched = False
                 arpPkt = pkt[Arp]
                 doneReply = False
-
                 for interface in self.my_interfaces:
                     if interface.ipaddr == arpPkt.targetprotoaddr:
                         ARPMatched = True
                         break
 
                 if ARPMatched == True:
-                    if arpPkt.operation==ArpOperation.Reply:
-                        for q in self.queue:                            
-                            if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
-                                self.queue.remove(q)
-                                for buf in self.buffer:
-                                    if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
-                                        newpkt = buf.packet
-                                        newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
-                                        self.net.send_packet(input_port,newpkt)
-                                self.buffer.clear()
-                                doneReply = True
-
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     if doneReply == True:
@@ -179,7 +185,7 @@ class Router(object):
                         if buf.nexthop == matchEntry.nexthop:
                             bufMatch = 1
                     if bufMatch == 1:
-                        self.buffer.append(BufferEntry(pkt,matchEntry.nexthop))                    
+                        self.buffer.append(BufferEntry(pkt,matchEntry.nexthop))                
                         continue
                     srchw = 1
                     for intf in self.net.interfaces():
@@ -271,6 +277,7 @@ class Router(object):
         for port in self.my_interfaces:
             if destAddr == port.ipaddr:
                 print("Destination is this router's port; dropping packet")
+                print(port.name)
                 return True
         return False
 
@@ -319,3 +326,8 @@ def main(net):
     r = Router(net)
     r.router_main()
     net.shutdown()
+
+
+
+
+
