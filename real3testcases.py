@@ -42,22 +42,6 @@ def router_tests():
     p += b'These are some application data bytes'
     s.expect(PacketInputEvent("router-eth0", p), "UDP packet to be forwarded to 172.16.42.2 should arrive on router-eth0")
 
-    # 2 - Receive ARP Request that is NOT router's own port
-    # Expected - drop packet
-    arp_request  = create_ip_arp_request('10:00:00:00:00:06', '172.16.42.1', '172.16.42.2')
-    s.expect(PacketInputEvent("router-eth0", arp_request), "ARP request should arrive on router-eth0 and be dropped. Not in own ports")
-
-    # 3 - Receive ARP Request that is for one of your router's own ports
-    # Expected - send arp reply
-    arp_request  = create_ip_arp_request('30:00:00:00:00:02', '172.16.99.1', '10.10.0.1')
-    s.expect(PacketInputEvent("router-eth0", arp_request), "ARP request should arrive on router-eth0, for own port")
-
-    # 4 - send ARP response
-    # Expected - send arp response to case 3
-    arp_response = create_ip_arp_reply('10:00:00:00:00:02', '30:00:00:00:00:02',
-                                       '10.10.0.1', '172.16.99.1')
-    s.expect(PacketOutputEvent("router-eth1", arp_response), "Router should send ARP response for 172.16.99.1 out router-eth1 interface")
-
     #5 1   IP packet to be forwarded to 172.16.42.2 should arrive on
     #     router-eth0
     #         Expected event: recv_packet Ethernet
@@ -96,40 +80,113 @@ def router_tests():
     #         192.168.1.100->172.16.42.2 ICMP | ICMP EchoRequest 0 42 (0
     #         data bytes) out router-eth2
 
-    packet = mk_pkt(hwsrc='10:00:00:00:00:03', hwdst='30:00:00:00:00:01', ipsrc='192.168.1.100', ipdst='192.168.1.1', ttl=63)
+    packet = mk_pkt(hwsrc='10:00:00:00:00:03', hwdst='30:00:00:00:00:01', ipsrc='192.168.1.100', ipdst='172.16.42.2', ttl=63)
     s.expect(PacketOutputEvent("router-eth2", packet), "IP packet should be forwarded to 192.168.1.1 out router-eth2")
 
 
+    # 2 - Receive ARP Request that is NOT router's own port
+    # Expected - drop packet
+    arp_request  = create_ip_arp_request('10:00:00:00:00:06', '172.16.42.1', '172.16.42.2')
+    s.expect(PacketInputEvent("router-eth0", arp_request), "ARP request should arrive on router-eth0 and be dropped. Not in own ports")
+
+    # 3 - Receive ARP Request that is for one of your router's own ports
+    # Expected - send arp reply
+    arp_request  = create_ip_arp_request('30:00:00:00:00:02', '172.16.99.1', '10.10.0.1')
+    s.expect(PacketInputEvent("router-eth0", arp_request), "ARP request should arrive on router-eth0, for own port")
+
+    # 4 - send ARP response
+    # Expected - send arp response to case 3
+    arp_response = create_ip_arp_reply('10:00:00:00:00:02', '30:00:00:00:00:02',
+                                       '10.10.0.1', '172.16.99.1')
+    s.expect(PacketOutputEvent("router-eth0", arp_response), "Router should send ARP response for 172.16.99.1 out router-eth0 interface")
+
+
+
     #9 packet that matches in fTable. Needs ARP request. tries 3 times and stops
-    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.16.42.2', ipdst = '192.168.1.1')
+    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.16.42.2', ipdst = '192.168.1.2')
     s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.19.42.2 should arrive on router-eth0")
 
     #9.2
-    arp_request  = create_ip_arp_request('10:00:00:00:00:03', '172.16.42.1', '192.168.1.1')
-    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 192.168.1.1 out router-eth2 interface")
+    arp_request  = create_ip_arp_request('10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')
+    s.expect(PacketOutputEvent("router-eth0", arp_request), "Router should send ARP request for 192.168.1.2 out router-eth2 interface")
 
     #9.3
     s.expect(PacketInputTimeoutEvent(1), "Waiting 1 seconds")
 
+    # 1 - Receive non ARP, non IPv4, non dynamic packet
+    # Expected - Drop packet
+    p = Ethernet() + IPv4(protocol=IPProtocol.UDP) + UDP()
+    p[UDP].src = 4444
+    p[UDP].dst = 5555
+    p += b'These are some application data bytes'
+    s.expect(PacketInputEvent("router-eth0", p), "UDP packet to be forwarded to 172.16.42.2 should arrive on router-eth0")
+
     #9.4
-    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 192.168.1.1 out router-eth2 interface")
+    s.expect(PacketOutputEvent("router-eth0", arp_request), "Router should send ARP request for 192.168.1.2 out router-eth2 interface")
 
     #9.5
     s.expect(PacketInputTimeoutEvent(1), "Waiting 1 seconds")
 
+  #5 1   IP packet to be forwarded to 172.16.42.2 should arrive on
+    #     router-eth0
+    #         Expected event: recv_packet Ethernet
+    #         10:00:00:00:00:03->30:00:00:00:00:01 IP | IPv4
+    #         192.168.1.100->172.16.42.2 ICMP | ICMP EchoRequest 0 42 (0
+    #         data bytes) on router-eth0
+
+    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.168.1.100', ipdst = '172.16.42.2')
+    s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.16.42.2 should arrive on router-eth0")
+
+
     #9.6 or 14
-    s.expect(PacketOutputEvent("router-eth2", arp_request), "Router should send ARP request for 192.168.1.1 out router-eth2 interface")
+    s.expect(PacketOutputEvent("router-eth0", arp_request), "Router should send ARP request for 192.168.1.2 out router-eth2 interface")
+
+    # 1 - Receive non ARP, non IPv4, non dynamic packet
+    # Expected - Drop packet
+    p = Ethernet() + IPv4(protocol=IPProtocol.UDP) + UDP()
+    p[UDP].src = 4444
+    p[UDP].dst = 5555
+    p += b'These are some application data bytes'
+    s.expect(PacketInputEvent("router-eth0", p), "UDP packet to be forwarded to 172.16.42.2 should arrive on router-eth0")
 
 
+    #9 packet that matches in fTable. Needs ARP request. tries 3 times and stops
+    packet = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.16.42.2', ipdst = '192.168.1.2')
+    s.expect(PacketInputEvent("router-eth0", packet), "IP packet to be forwarded to 172.19.42.2 should arrive on router-eth0")
 
+    #9.2
+    arp_request  = create_ip_arp_request('10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')
+    s.expect(PacketOutputEvent("router-eth0", arp_request), "Router should send ARP request for 192.168.1.2 out router-eth2 interface")
 
+    #9.3
+    s.expect(PacketInputTimeoutEvent(1), "Waiting 1 seconds")
 
+    # 1 - Receive non ARP, non IPv4, non dynamic packet
+    # Expected - Drop packet
+    p = Ethernet() + IPv4(protocol=IPProtocol.UDP) + UDP()
+    p[UDP].src = 4444
+    p[UDP].dst = 5555
+    p += b'These are some application data bytes'
+    s.expect(PacketInputEvent("router-eth0", p), "UDP packet to be forwarded to 172.16.42.2 should arrive on router-eth0")
 
+    #9.2
+    arp_request  = create_ip_arp_request('10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')
+    s.expect(PacketOutputEvent("router-eth0", arp_request), "Router should send ARP request for 192.168.1.2 out router-eth2 interface")
 
+    #yay a reply comes
+    arp_response = create_ip_arp_reply('30:00:00:00:00:01', '10:00:00:00:00:01',
+                                       '192.168.1.2', '192.168.1.1')
+    s.expect(PacketInputEvent("router-eth2", arp_response), "Router should receive ARP response for 172.16.42.2 on router-eth2 interface")
 
+    # forward both queued packets now
+    pkt = mk_pkt(hwsrc = '10:00:00:00:00:03', hwdst =  '30:00:00:00:00:01', ipsrc  = '192.16.42.2', ipdst = '192.168.1.2', ttl=63)
+
+    s.expect(PacketOutputEvent("router-eth2", pkt), "IP packet should be forwarded to 192.168.1.2 out router-eth2")
 
 
     return s
 
 scenario = router_tests()
+
+
 
