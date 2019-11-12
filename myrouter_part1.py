@@ -29,6 +29,7 @@ class Router(object):
             except NoPackets:
                 log_debug("No packets available in recv_packet")
                 gotpkt = False
+                continue
             except Shutdown:
                 log_debug("Got shutdown signal")
                 break
