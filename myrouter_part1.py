@@ -39,6 +39,9 @@ class Router(object):
             if pkt.has_header(Arp):
                 matched = False
                 arpPkt = pkt[Arp]
+                if arpPkt.operation == ArpOperation.Reply: #part 1 only wants arp requests
+                    continue
+                
                 for interface in self.my_interfaces:
                     if interface.ipaddr == arpPkt.targetprotoaddr:
                         matched = True
