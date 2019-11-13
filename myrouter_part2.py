@@ -187,7 +187,7 @@ class Router(object):
 
     def checkForAddr(self, entry):
         for x in self.arp_table:
-            if self.arp_table[x] == entry.prefix:        
+            if x == entry.prefix:        
                 return self.arp_table[x]
         return 0
 
