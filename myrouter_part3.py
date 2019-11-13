@@ -94,6 +94,8 @@ class Router(object):
                             self.buffer.clear()
                             ARPMatched = True
                 if ARPMatched == True:
+                    #store in ARP table
+                    self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     continue
 
             #check for how long ARP entries have been waiting
