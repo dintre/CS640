@@ -73,6 +73,24 @@ class Router(object):
             print(time.time())
             print(pkt)
 
+            #check if this packet is reply we've needed
+            if pkt.has_header(Arp):
+                arpPkt = pkt[Arp]
+                ARPMatched = False
+                if arpPkt.operation==ArpOperation.Reply:
+                    for q in self.queue:                        
+                        if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
+                            self.queue.remove(q)
+                            for buf in self.buffer:
+                                if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
+                                    newpkt = buf.packet
+                                    newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
+                                    self.net.send_packet(input_port,newpkt)
+                            self.buffer.clear()
+                            ARPMatched = True
+                if ARPMatched == True:
+                    continue
+
             #check for how long ARP entries have been waiting
             for entry in self.queue:
                 #if it's been treid 3 times, drop it and dequeue.
@@ -100,17 +118,6 @@ class Router(object):
                         break
 
                 if ARPMatched == True:
-                    if arpPkt.operation==ArpOperation.Reply:
-                        for q in self.queue:                            
-                            if arpPkt.senderprotoaddr == q.packet[IPv4].dst:
-                                self.queue.remove(q)
-                                for buf in self.buffer:
-                                    if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
-                                        newpkt = buf.packet
-                                        newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
-                                        self.net.send_packet(input_port,newpkt)
-                                doneReply = True
-
                     #store in ARP table
                     self.arp_table[arpPkt.senderprotoaddr] = arpPkt.senderhwaddr
                     if doneReply == True:
@@ -166,7 +173,7 @@ class Router(object):
                             srchw = intf.ethaddr
                     sendarppkt = create_ip_arp_request(srchw,matchEntry.prefix,ipPkt.dst)
                     self.net.send_packet(matchEntry.portName,sendarppkt)
-                    self.queue.append(QueueEntry(time.time(),pkt,sendarppkt,matchEntry.portName))
+                    self.queue.append(QueueEntry(time.time(),pkt,sendarppkt,matchEntry.portName,matchEntry.nexthop))
                     self.buffer.append(BufferEntry(pkt,matchEntry.nexthop))
 
 
@@ -214,15 +221,20 @@ class Router(object):
         for intf in self.my_interfaces:
             self.fTable.append(ForwardingEntry(str(intf.ipaddr), str(intf.netmask), intf.name))
 
-        #read from file
-        file = open("forwarding_table.txt", "r")
-        if file.mode == 'r':
-            fileData = file.readlines()
-            print("Reading entries into table...")
-            for line in fileData:
-                line = line.strip("\n")
-                data = line.split(" ")
-                self.fTable.append(ForwardingEntry(data[0], data[1], data[3], data[2]))
+        try:
+            #read from file
+            file = open("forwarding_table.txt", "r")
+            if file.mode == 'r':
+                fileData = file.readlines()
+                print("Reading entries into table...")
+                for line in fileData:
+                    if line.strip():
+                        continue
+                    line = line.strip("\n")
+                    data = line.split(" ")
+                    self.fTable.append(ForwardingEntry(data[0], data[1], data[3], data[2]))
+        except IOError:
+            print("Could not read a file.")
 
 def main(net):
     '''
@@ -232,7 +244,4 @@ def main(net):
     r = Router(net)
     r.router_main()
     net.shutdown()
-
-
-
 
