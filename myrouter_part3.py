@@ -73,10 +73,10 @@ class Router(object):
             if gotpkt:
                 log_debug("Got a packet: {}".format(str(pkt)))
 
-            print()
+            #print()
             print(time.time())
             print(pkt)
-            print(input_port)
+            #print(input_port)
 
             #check if this packet is reply we've needed
             if pkt.has_header(Arp):
@@ -89,6 +89,8 @@ class Router(object):
                             for buf in self.buffer:
                                 if buf.packet[IPv4].dst == arpPkt.senderprotoaddr:
                                     newpkt = buf.packet
+                                    newpkt[Ethernet].dst = arpPkt.senderhwaddr
+                                    newpkt[Ethernet].src = self.getPortEthernet(input_port)
                                     newpkt[IPv4].ttl = newpkt[IPv4].ttl-1
                                     self.net.send_packet(input_port,newpkt)
                             self.buffer.clear()
@@ -175,8 +177,10 @@ class Router(object):
                 #if ARP table does have the pair,
                 #send the packet out the correct port
                 if hasARPAlready != 0:
-                    ipPkt.ttl = ipPkt.ttl - 1
-                    outputPort = findPort(hasARPAlready)
+                    pkt[IPv4].ttl = ipPkt.ttl - 1
+                    pkt[Ethernet].src = self.getPortEthernet(input_port)
+                    pkt[Ethernet].dst = hasARPAlready
+                    outputPort = self.findPort(hasARPAlready)
                     self.net.send_packet(outputPort,pkt)
 
                 #if ARP table does NOT have the pair,
@@ -268,6 +272,12 @@ class Router(object):
                 return port.name
         return 0
 
+    def getPortEthernet(self, portName):
+        for port in self.my_interfaces:
+            if port.name == portName:
+                return port.ethaddr
+        return 0
+
     def checkForAddr(self, entry):
         for x in self.arp_table:
             if x == entry.prefix:        
@@ -328,8 +338,3 @@ def main(net):
     r = Router(net)
     r.router_main()
     net.shutdown()
-
-
-
-
-
