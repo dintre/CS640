@@ -188,7 +188,7 @@ class Router(object):
                     for intf in self.net.interfaces():
                         if matchEntry.prefix == str(intf.ipaddr):
                             srchw = intf.ethaddr
-                       elif intf.name==matchEntry.portName:
+                        elif intf.name==matchEntry.portName:
                             srchw = intf.ethaddr
                     sendarppkt = create_ip_arp_request(srchw,matchEntry.prefix,ipPkt.dst)
                     self.net.send_packet(matchEntry.portName,sendarppkt)
